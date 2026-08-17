@@ -65,3 +65,10 @@ class ConfigDB:
         
     def set_language(self, lang):
         self.set_config('language', lang)
+
+    def get_ignored_update(self, container_name):
+        return self.get_config(f'ignore_{container_name}')
+
+    def set_ignored_update(self, container_name, digest):
+        if digest:
+            self.set_config(f'ignore_{container_name}', digest)

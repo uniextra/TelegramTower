@@ -20,7 +20,7 @@ class DockerManager:
         if str(labels.get('telegramtower.enable', '')).lower() == 'false' or \
            str(labels.get('com.centurylinklabs.watchtower.enable', '')).lower() == 'false':
             logger.info(f"Skipping container {container.name} due to disable label.")
-            return None
+            return None, None
 
         image = container.image
         # Get the actual image name used to start the container
@@ -44,18 +44,18 @@ class DockerManager:
                 local_digest = image.attrs["RepoDigests"][0]
                 # local_digest is like "ubuntu@sha256:..."
                 if remote_digest not in local_digest:
-                    return image_name
-            return None
+                    return image_name, remote_digest
+            return None, None
         except docker.errors.APIError as e:
             if e.response.status_code == 403:
                 # Likely a local image or private registry without auth
                 logger.debug(f"Skipping {container.name} ({image_name}): Access forbidden (local or private image).")
             else:
                 logger.error(f"API Error checking updates for {container.name}: {e}")
-            return None
+            return None, None
         except Exception as e:
             logger.error(f"Error checking updates for {container.name}: {e}")
-            return None
+            return None, None
 
     def update_container(self, container_id, cleanup_old_image=False):
         """

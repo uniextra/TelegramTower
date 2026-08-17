@@ -29,7 +29,7 @@ STRINGS = {
         'ignore_btn': "Ignore",
         'update_msg': "🚀 Update available for container *{container}*{state}\nNew image: `{image}`",
         'state_stopped': " *(Stopped)*",
-        'ignored_msg': "Ignored update for {container}.",
+        'ignored_msg': "Ignored update for {container}. I will not notify you again until a newer version is released.",
         'updating_msg': "Updating {container}... please wait.",
         'not_found_msg': "Container {container} not found.",
         'success': "✅ Success",
@@ -57,7 +57,7 @@ STRINGS = {
         'ignore_btn': "Ignorar",
         'update_msg': "🚀 Actualización disponible para *{container}*{state}\nNueva imagen: `{image}`",
         'state_stopped': " *(Detenido)*",
-        'ignored_msg': "Actualización ignorada para {container}.",
+        'ignored_msg': "Actualización ignorada para {container}. No volveré a avisarte de esta versión específica.",
         'updating_msg': "Actualizando {container}... por favor espera.",
         'not_found_msg': "Contenedor {container} no encontrado.",
         'success': "✅ Éxito",
@@ -73,6 +73,7 @@ class TelegramBot:
         self.config_db = config_db
         self.application = Application.builder().token(self.token).build()
         self._check_job = None
+        self.pending_updates = {}
         self._setup_handlers()
 
     def _setup_handlers(self):
@@ -259,6 +260,18 @@ class TelegramBot:
             return
             
         if action == "ignore":
+            remote_digest = self.pending_updates.get(container_name)
+            if not remote_digest:
+                # Re-fetch it just in case memory was cleared
+                include_stopped = self.config_db.get_include_stopped()
+                containers = self.docker_manager.get_containers(include_stopped=include_stopped)
+                target = next((c for c in containers if c.name == container_name), None)
+                if target:
+                    _, remote_digest = self.docker_manager.check_for_updates(target)
+            
+            if remote_digest:
+                self.config_db.set_ignored_update(container_name, remote_digest)
+                
             await query.edit_message_text(text=self.t('ignored_msg', container=container_name))
             return
             
@@ -276,6 +289,10 @@ class TelegramBot:
             cleanup = self.config_db.get_cleanup_old_image()
             success, msg_str = self.docker_manager.update_container(target.id, cleanup_old_image=cleanup)
             status = self.t('success') if success else self.t('failed')
+            
+            if success:
+                self.pending_updates.pop(container_name, None)
+                
             await query.edit_message_text(text=f"{status}: {msg_str}")
 
     # --- Core Logic ---
@@ -304,8 +321,15 @@ class TelegramBot:
                 await asyncio.sleep(delay)
                 
             logger.info(f"Inspecting container {container.name} (status: {container.status})")
-            new_image = self.docker_manager.check_for_updates(container)
-            if new_image:
+            new_image, remote_digest = self.docker_manager.check_for_updates(container)
+            
+            if new_image and remote_digest:
+                ignored_digest = self.config_db.get_ignored_update(container.name)
+                if ignored_digest == remote_digest:
+                    logger.info(f"Update for {container.name} was previously ignored. Skipping.")
+                    continue
+                    
+                self.pending_updates[container.name] = remote_digest
                 logger.info(f"Update found for {container.name}: {new_image}. Sending notification...")
                 is_stopped = container.status != 'running'
                 await self.send_update_notification(container.name, new_image, is_stopped)
