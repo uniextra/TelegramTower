@@ -62,7 +62,7 @@ services:
 ## Settings Configuration
 Once the container starts, it will send a greeting message to your Telegram chat. 
 Click **⚙️ Settings** to open the interactive configuration panel. Alternatively, you can send the `/settings` command to the bot at any time to adjust:
-- **Check Interval:** How often to check for updates (1, 7, or 30 days).
+- **Check Interval:** How often to check for updates (1, 7, or 30 days). *(Note: TelegramTower performs its first check 10 seconds after startup, and then waits the configured interval before the next one).*
 - **Request Delay:** Wait time between checks (0s, 2s, 5s) to avoid Docker Hub rate limits.
 - **Cleanup Old Image:** Automatically delete old images after a successful update.
 - **Check Stopped:** Include stopped containers in the update checks.
