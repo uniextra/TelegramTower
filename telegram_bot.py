@@ -6,6 +6,65 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 
 logger = logging.getLogger(__name__)
 
+STRINGS = {
+    'en': {
+        'startup': "🤖 *TelegramTower has started!*\n\nI am ready to monitor your Docker containers.",
+        'settings_main': "⚙️ *Settings Menu*\n\n• *Check Interval:* How often I check for container updates.\n• *Request Delay:* Wait time between checks to avoid rate limits.\n• *Cleanup Old Image:* Automatically delete old images after successful updates.\n• *Check Stopped:* Include stopped containers in the update checks.",
+        'settings_btn': "⚙️ Settings",
+        'btn_interval': "⏱ Check Interval",
+        'btn_delay': "⏳ Request Delay",
+        'btn_cleanup': "🧹 Cleanup Old Image",
+        'btn_stopped': "🛑 Check Stopped",
+        'interval_ui': "⏱ *Check Interval*\n\nCurrently checking every *{days} day(s)*.\n\nSelect a new interval:",
+        'delay_ui': "⏳ *Request Delay*\n\nCurrently pausing for *{delay}s* between checks.\n\nSelect a new delay:",
+        'cleanup_ui': "🧹 *Cleanup Old Image*\n\nCurrent state: *{state}*.\n\nIf enabled, I will delete the old image after a successful update.",
+        'stopped_ui': "🛑 *Check Stopped Containers*\n\nCurrent state: *{state}*.\n\nIf enabled, I will check for updates on stopped containers. They will remain stopped after updating.",
+        'btn_back': "🔙 Back to Settings",
+        'enabled': "Enabled",
+        'disabled': "Disabled",
+        'day_1': "1 Day",
+        'days_7': "7 Days",
+        'days_30': "30 Days",
+        'update_btn': "Update",
+        'ignore_btn': "Ignore",
+        'update_msg': "🚀 Update available for container *{container}*{state}\nNew image: `{image}`",
+        'state_stopped': " *(Stopped)*",
+        'ignored_msg': "Ignored update for {container}.",
+        'updating_msg': "Updating {container}... please wait.",
+        'not_found_msg': "Container {container} not found.",
+        'success': "✅ Success",
+        'failed': "❌ Failed"
+    },
+    'es': {
+        'startup': "🤖 *¡TelegramTower ha iniciado!*\n\nEstoy listo para monitorizar tus contenedores Docker.",
+        'settings_main': "⚙️ *Menú de Ajustes*\n\n• *Check Interval:* Cada cuánto tiempo verificaré actualizaciones.\n• *Request Delay:* Espera entre comprobaciones para evitar bloqueos por límite de peticiones.\n• *Cleanup Old Image:* Eliminar automáticamente la imagen antigua tras una actualización.\n• *Check Stopped:* Incluir contenedores detenidos en las comprobaciones.",
+        'settings_btn': "⚙️ Ajustes",
+        'btn_interval': "⏱ Intervalo",
+        'btn_delay': "⏳ Retraso",
+        'btn_cleanup': "🧹 Limpiar Imagen",
+        'btn_stopped': "🛑 Detenidos",
+        'interval_ui': "⏱ *Intervalo de Comprobación*\n\nActualmente comprobando cada *{days} día(s)*.\n\nSelecciona el nuevo intervalo:",
+        'delay_ui': "⏳ *Retraso de Peticiones*\n\nActualmente esperando *{delay}s* entre contenedores.\n\nSelecciona el nuevo retraso:",
+        'cleanup_ui': "🧹 *Limpiar Imagen Antigua*\n\nEstado actual: *{state}*.\n\nSi está activado, borraré la imagen antigua tras actualizar con éxito.",
+        'stopped_ui': "🛑 *Comprobar Contenedores Detenidos*\n\nEstado actual: *{state}*.\n\nSi está activado, buscaré actualizaciones en contenedores detenidos. Se mantendrán detenidos tras actualizarse.",
+        'btn_back': "🔙 Volver a Ajustes",
+        'enabled': "Activado",
+        'disabled': "Desactivado",
+        'day_1': "1 Día",
+        'days_7': "7 Días",
+        'days_30': "30 Días",
+        'update_btn': "Actualizar",
+        'ignore_btn': "Ignorar",
+        'update_msg': "🚀 Actualización disponible para *{container}*{state}\nNueva imagen: `{image}`",
+        'state_stopped': " *(Detenido)*",
+        'ignored_msg': "Actualización ignorada para {container}.",
+        'updating_msg': "Actualizando {container}... por favor espera.",
+        'not_found_msg': "Contenedor {container} no encontrado.",
+        'success': "✅ Éxito",
+        'failed': "❌ Error"
+    }
+}
+
 class TelegramBot:
     def __init__(self, token, chat_id, docker_manager, config_db):
         self.token = token
@@ -22,86 +81,97 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("config", self.settings_command))
         self.application.add_handler(CallbackQueryHandler(self.button_handler))
 
+    def t(self, key, **kwargs):
+        lang = self.config_db.get_language()
+        text = STRINGS.get(lang, STRINGS['en']).get(key, key)
+        if kwargs:
+            return text.format(**kwargs)
+        return text
+
+    def _update_language(self, update: Update):
+        if update.effective_user and update.effective_user.language_code:
+            lang_code = update.effective_user.language_code.lower()
+            lang = 'es' if lang_code.startswith('es') else 'en'
+            self.config_db.set_language(lang)
+
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        self._update_language(update)
         msg, reply_markup = self._get_startup_ui()
         await update.message.reply_text(text=msg, reply_markup=reply_markup, parse_mode="Markdown")
 
     # --- UI Generators ---
 
     def _get_startup_ui(self):
-        msg = "🤖 *TelegramTower has started!*\n\nI am ready to monitor your Docker containers."
-        keyboard = [[InlineKeyboardButton("⚙️ Settings", callback_data="menu_main_settings")]]
+        msg = self.t('startup')
+        keyboard = [[InlineKeyboardButton(self.t('settings_btn'), callback_data="menu_main_settings")]]
         return msg, InlineKeyboardMarkup(keyboard)
 
     def _get_settings_main_ui(self):
-        msg = (
-            "⚙️ *Settings Menu*\n\n"
-            "• *Check Interval:* Configura cada cuánto tiempo verificaré si hay nuevas versiones de tus contenedores.\n"
-            "• *Request Delay:* Configura el tiempo de espera entre cada consulta a Docker Hub para evitar bloqueos por límite de peticiones (Rate Limit).\n"
-            "• *Cleanup Old Image:* Elimina automáticamente la imagen antigua después de actualizar con éxito.\n"
-            "• *Check Stopped:* Si está habilitado, también actualiza contenedores detenidos (sin iniciarlos)."
-        )
+        msg = self.t('settings_main')
         keyboard = [
-            [InlineKeyboardButton("⏱ Check Interval", callback_data="menu_set_interval")],
-            [InlineKeyboardButton("⏳ Request Delay", callback_data="menu_set_delay")],
-            [InlineKeyboardButton("🧹 Cleanup Old Image", callback_data="menu_set_cleanup")],
-            [InlineKeyboardButton("🛑 Check Stopped", callback_data="menu_set_stopped")]
+            [InlineKeyboardButton(self.t('btn_interval'), callback_data="menu_set_interval")],
+            [InlineKeyboardButton(self.t('btn_delay'), callback_data="menu_set_delay")],
+            [InlineKeyboardButton(self.t('btn_cleanup'), callback_data="menu_set_cleanup")],
+            [InlineKeyboardButton(self.t('btn_stopped'), callback_data="menu_set_stopped")]
         ]
         return msg, InlineKeyboardMarkup(keyboard)
 
     def _get_interval_ui(self):
         days = self.config_db.get_poll_interval_days()
-        msg = f"⏱ *Check Interval*\n\nActualmente comprobando cada *{days} día(s)*.\n\nSelecciona el nuevo intervalo:"
+        msg = self.t('interval_ui', days=days)
         keyboard = [
             [
-                InlineKeyboardButton(f"{'✅ ' if days == 1 else ''}1 Day", callback_data="set_interval_1"),
-                InlineKeyboardButton(f"{'✅ ' if days == 7 else ''}7 Days", callback_data="set_interval_7"),
-                InlineKeyboardButton(f"{'✅ ' if days == 30 else ''}30 Days", callback_data="set_interval_30"),
+                InlineKeyboardButton(f"{'✅ ' if days == 1 else ''}{self.t('day_1')}", callback_data="set_interval_1"),
+                InlineKeyboardButton(f"{'✅ ' if days == 7 else ''}{self.t('days_7')}", callback_data="set_interval_7"),
+                InlineKeyboardButton(f"{'✅ ' if days == 30 else ''}{self.t('days_30')}", callback_data="set_interval_30"),
             ],
-            [InlineKeyboardButton("🔙 Back to Settings", callback_data="menu_main_settings")]
+            [InlineKeyboardButton(self.t('btn_back'), callback_data="menu_main_settings")]
         ]
         return msg, InlineKeyboardMarkup(keyboard)
 
     def _get_delay_ui(self):
         delay = self.config_db.get_request_delay_seconds()
-        msg = f"⏳ *Request Delay*\n\nActualmente esperando *{delay}s* entre contenedores.\n\nSelecciona el nuevo tiempo de espera:"
+        msg = self.t('delay_ui', delay=delay)
         keyboard = [
             [
                 InlineKeyboardButton(f"{'✅ ' if delay == 0 else ''}0s", callback_data="set_delay_0"),
                 InlineKeyboardButton(f"{'✅ ' if delay == 2 else ''}2s", callback_data="set_delay_2"),
                 InlineKeyboardButton(f"{'✅ ' if delay == 5 else ''}5s", callback_data="set_delay_5"),
             ],
-            [InlineKeyboardButton("🔙 Back to Settings", callback_data="menu_main_settings")]
+            [InlineKeyboardButton(self.t('btn_back'), callback_data="menu_main_settings")]
         ]
         return msg, InlineKeyboardMarkup(keyboard)
 
     def _get_cleanup_ui(self):
         enabled = self.config_db.get_cleanup_old_image()
-        msg = f"🧹 *Cleanup Old Image*\n\nEstado actual: *{'Activado' if enabled else 'Desactivado'}*.\n\nSi está activado, borraré la imagen antigua una vez que el contenedor se haya actualizado correctamente."
+        state = self.t('enabled') if enabled else self.t('disabled')
+        msg = self.t('cleanup_ui', state=state)
         keyboard = [
             [
-                InlineKeyboardButton(f"{'✅ ' if enabled else ''}Enabled", callback_data="set_cleanup_1"),
-                InlineKeyboardButton(f"{'✅ ' if not enabled else ''}Disabled", callback_data="set_cleanup_0"),
+                InlineKeyboardButton(f"{'✅ ' if enabled else ''}{self.t('enabled')}", callback_data="set_cleanup_1"),
+                InlineKeyboardButton(f"{'✅ ' if not enabled else ''}{self.t('disabled')}", callback_data="set_cleanup_0"),
             ],
-            [InlineKeyboardButton("🔙 Back to Settings", callback_data="menu_main_settings")]
+            [InlineKeyboardButton(self.t('btn_back'), callback_data="menu_main_settings")]
         ]
         return msg, InlineKeyboardMarkup(keyboard)
 
     def _get_stopped_ui(self):
         enabled = self.config_db.get_include_stopped()
-        msg = f"🛑 *Check Stopped Containers*\n\nEstado actual: *{'Activado' if enabled else 'Desactivado'}*.\n\nSi está activado, buscaré actualizaciones también para contenedores que estén detenidos. Si apruebas la actualización de un contenedor detenido, se actualizará pero **se mantendrá detenido**."
+        state = self.t('enabled') if enabled else self.t('disabled')
+        msg = self.t('stopped_ui', state=state)
         keyboard = [
             [
-                InlineKeyboardButton(f"{'✅ ' if enabled else ''}Enabled", callback_data="set_stopped_1"),
-                InlineKeyboardButton(f"{'✅ ' if not enabled else ''}Disabled", callback_data="set_stopped_0"),
+                InlineKeyboardButton(f"{'✅ ' if enabled else ''}{self.t('enabled')}", callback_data="set_stopped_1"),
+                InlineKeyboardButton(f"{'✅ ' if not enabled else ''}{self.t('disabled')}", callback_data="set_stopped_0"),
             ],
-            [InlineKeyboardButton("🔙 Back to Settings", callback_data="menu_main_settings")]
+            [InlineKeyboardButton(self.t('btn_back'), callback_data="menu_main_settings")]
         ]
         return msg, InlineKeyboardMarkup(keyboard)
 
     # --- Handlers ---
 
     async def settings_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        self._update_language(update)
         msg, reply_markup = self._get_settings_main_ui()
         await update.message.reply_text(text=msg, reply_markup=reply_markup, parse_mode="Markdown")
 
@@ -109,13 +179,13 @@ class TelegramBot:
         """Sends a notification with Inline Keyboard to update or ignore."""
         keyboard = [
             [
-                InlineKeyboardButton("Update", callback_data=f"update_{container_name}"),
-                InlineKeyboardButton("Ignore", callback_data=f"ignore_{container_name}"),
+                InlineKeyboardButton(self.t('update_btn'), callback_data=f"update_{container_name}"),
+                InlineKeyboardButton(self.t('ignore_btn'), callback_data=f"ignore_{container_name}"),
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        state_info = " *(Stopped)*" if is_stopped else ""
-        message = f"🚀 Update available for container *{container_name}*{state_info}\nNew image: `{new_image}`"
+        state_info = self.t('state_stopped') if is_stopped else ""
+        message = self.t('update_msg', container=container_name, state=state_info, image=new_image)
         
         try:
             await self.application.bot.send_message(
@@ -125,6 +195,7 @@ class TelegramBot:
             logger.error(f"Failed to send message: {e}")
 
     async def button_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        self._update_language(update)
         query = update.callback_query
         await query.answer()
         data = query.data
@@ -188,24 +259,24 @@ class TelegramBot:
             return
             
         if action == "ignore":
-            await query.edit_message_text(text=f"Ignored update for {container_name}.")
+            await query.edit_message_text(text=self.t('ignored_msg', container=container_name))
             return
             
         if action == "update":
-            await query.edit_message_text(text=f"Updating {container_name}... please wait.")
+            await query.edit_message_text(text=self.t('updating_msg', container=container_name))
             
             include_stopped = self.config_db.get_include_stopped()
             containers = self.docker_manager.get_containers(include_stopped=include_stopped)
             target = next((c for c in containers if c.name == container_name), None)
             
             if not target:
-                await query.edit_message_text(text=f"Container {container_name} not found.")
+                await query.edit_message_text(text=self.t('not_found_msg', container=container_name))
                 return
                 
             cleanup = self.config_db.get_cleanup_old_image()
-            success, msg = self.docker_manager.update_container(target.id, cleanup_old_image=cleanup)
-            status = "✅ Success" if success else "❌ Failed"
-            await query.edit_message_text(text=f"{status}: {msg}")
+            success, msg_str = self.docker_manager.update_container(target.id, cleanup_old_image=cleanup)
+            status = self.t('success') if success else self.t('failed')
+            await query.edit_message_text(text=f"{status}: {msg_str}")
 
     # --- Core Logic ---
 

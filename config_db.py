@@ -59,3 +59,9 @@ class ConfigDB:
 
     def set_include_stopped(self, enable):
         self.set_config('include_stopped', '1' if enable else '0')
+        
+    def get_language(self):
+        return self.get_config('language', 'en')
+        
+    def set_language(self, lang):
+        self.set_config('language', lang)
