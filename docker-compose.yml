@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  telegramtower:
+    build: .
+    image: telegramtower:latest
+    container_name: telegramtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data:/app/data
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
