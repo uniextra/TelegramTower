@@ -102,7 +102,7 @@ class DockerManager:
                 primary_network = list(networks.keys())[0] if networks else host_config.get('NetworkMode')
                 
                 kwargs = dict(
-                    image=new_image.id,
+                    image=image_name,
                     name=name,
                     command=container_config.get('Cmd'),
                     environment=container_config.get('Env'),
