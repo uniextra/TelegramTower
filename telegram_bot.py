@@ -264,10 +264,10 @@ class TelegramBot:
             if not remote_digest:
                 # Re-fetch it just in case memory was cleared
                 include_stopped = self.config_db.get_include_stopped()
-                containers = self.docker_manager.get_containers(include_stopped=include_stopped)
+                containers = await asyncio.to_thread(self.docker_manager.get_containers, include_stopped)
                 target = next((c for c in containers if c.name == container_name), None)
                 if target:
-                    _, remote_digest = self.docker_manager.check_for_updates(target)
+                    _, remote_digest = await asyncio.to_thread(self.docker_manager.check_for_updates, target)
             
             if remote_digest:
                 self.config_db.set_ignored_update(container_name, remote_digest)
@@ -279,7 +279,7 @@ class TelegramBot:
             await query.edit_message_text(text=self.t('updating_msg', container=container_name))
             
             include_stopped = self.config_db.get_include_stopped()
-            containers = self.docker_manager.get_containers(include_stopped=include_stopped)
+            containers = await asyncio.to_thread(self.docker_manager.get_containers, include_stopped)
             target = next((c for c in containers if c.name == container_name), None)
             
             if not target:
@@ -287,7 +287,10 @@ class TelegramBot:
                 return
                 
             cleanup = self.config_db.get_cleanup_old_image()
-            success, msg_str = self.docker_manager.update_container(target.id, cleanup_old_image=cleanup)
+            
+            # Execute the heavy update process in a separate thread so it doesn't block the UI
+            success, msg_str = await asyncio.to_thread(self.docker_manager.update_container, target.id, cleanup)
+            
             status = self.t('success') if success else self.t('failed')
             
             if success:
@@ -315,13 +318,13 @@ class TelegramBot:
         delay = self.config_db.get_request_delay_seconds()
         include_stopped = self.config_db.get_include_stopped()
         
-        containers = self.docker_manager.get_containers(include_stopped=include_stopped)
+        containers = await asyncio.to_thread(self.docker_manager.get_containers, include_stopped)
         for i, container in enumerate(containers):
             if i > 0 and delay > 0:
                 await asyncio.sleep(delay)
                 
             logger.info(f"Inspecting container {container.name} (status: {container.status})")
-            new_image, remote_digest = self.docker_manager.check_for_updates(container)
+            new_image, remote_digest = await asyncio.to_thread(self.docker_manager.check_for_updates, container)
             
             if new_image and remote_digest:
                 ignored_digest = self.config_db.get_ignored_update(container.name)
