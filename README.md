@@ -50,6 +50,12 @@ To prevent TelegramTower from monitoring specific containers, add one of the fol
 * `telegramtower.enable=false`
 * `com.centurylinklabs.watchtower.enable=false` (Supported for easy migration from Watchtower)
 
+### 4. Auto-Update Containers
+If you want specific containers to bypass the manual approval process and update automatically whenever a new version is found, you can do this in two ways:
+1. Click the **[ 🔄 Auto-Update ]** button on a Telegram notification when an update is available.
+2. Add the following label to the container's compose file or run command:
+* `telegramtower.autoupdate=true`
+
 Example in `docker-compose.yml`:
 ```yaml
 services:
@@ -57,6 +63,8 @@ services:
     image: nginx:latest
     labels:
       - "telegramtower.enable=false"
+      # Or for auto-updating:
+      # - "telegramtower.autoupdate=true"
 ```
 
 ## Settings Configuration

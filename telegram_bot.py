@@ -27,10 +27,13 @@ STRINGS = {
         'days_30': "30 Days",
         'update_btn': "Update",
         'ignore_btn': "Ignore",
+        'auto_update_btn': "🔄 Auto-Update",
         'update_msg': "🚀 Update available for container *{container}*{state}\nNew image: `{image}`",
         'state_stopped': " *(Stopped)*",
         'ignored_msg': "Ignored update for {container}. I will not notify you again until a newer version is released.",
         'updating_msg': "Updating {container}... please wait.",
+        'auto_updating_msg': "Updating {container}... and setting to auto-update in the future.",
+        'auto_updated_notification': "🚀 Automatically updated container *{container}* to new image:\n`{image}`",
         'not_found_msg': "Container {container} not found.",
         'success': "✅ Success",
         'failed': "❌ Failed"
@@ -55,10 +58,13 @@ STRINGS = {
         'days_30': "30 Días",
         'update_btn': "Actualizar",
         'ignore_btn': "Ignorar",
+        'auto_update_btn': "🔄 Auto-Actualizar",
         'update_msg': "🚀 Actualización disponible para *{container}*{state}\nNueva imagen: `{image}`",
         'state_stopped': " *(Detenido)*",
         'ignored_msg': "Actualización ignorada para {container}. No volveré a avisarte de esta versión específica.",
         'updating_msg': "Actualizando {container}... por favor espera.",
+        'auto_updating_msg': "Actualizando {container}... y configurado para actualizarse automáticamente en el futuro.",
+        'auto_updated_notification': "🚀 Contenedor *{container}* actualizado automáticamente a la nueva imagen:\n`{image}`",
         'not_found_msg': "Contenedor {container} no encontrado.",
         'success': "✅ Éxito",
         'failed': "❌ Error"
@@ -182,6 +188,9 @@ class TelegramBot:
             [
                 InlineKeyboardButton(self.t('update_btn'), callback_data=f"update_{container_name}"),
                 InlineKeyboardButton(self.t('ignore_btn'), callback_data=f"ignore_{container_name}"),
+            ],
+            [
+                InlineKeyboardButton(self.t('auto_update_btn'), callback_data=f"auto_{container_name}")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -275,8 +284,12 @@ class TelegramBot:
             await query.edit_message_text(text=self.t('ignored_msg', container=container_name))
             return
             
-        if action == "update":
-            await query.edit_message_text(text=self.t('updating_msg', container=container_name))
+        if action in ["update", "auto"]:
+            if action == "auto":
+                self.config_db.set_auto_update(container_name, True)
+                await query.edit_message_text(text=self.t('auto_updating_msg', container=container_name))
+            else:
+                await query.edit_message_text(text=self.t('updating_msg', container=container_name))
             
             include_stopped = self.config_db.get_include_stopped()
             containers = await asyncio.to_thread(self.docker_manager.get_containers, include_stopped)
@@ -331,7 +344,31 @@ class TelegramBot:
                 if ignored_digest == remote_digest:
                     logger.info(f"Update for {container.name} was previously ignored. Skipping.")
                     continue
+
+                # Check Auto-update settings
+                labels = getattr(container, 'labels', {})
+                label_auto = str(labels.get('telegramtower.autoupdate', '')).lower() == 'true'
+                db_auto = self.config_db.get_auto_update(container.name)
+                
+                if label_auto or db_auto:
+                    logger.info(f"Auto-updating {container.name}...")
+                    cleanup = self.config_db.get_cleanup_old_image()
+                    success, msg_str = await asyncio.to_thread(self.docker_manager.update_container, container.id, cleanup)
+                    status = self.t('success') if success else self.t('failed')
                     
+                    if success:
+                        msg = self.t('auto_updated_notification', container=container.name, image=new_image)
+                    else:
+                        msg = self.t('auto_updating_msg', container=container.name)  # fallback
+                    
+                    await self.application.bot.send_message(
+                        chat_id=self.chat_id,
+                        text=f"{msg}\n{status}: {msg_str}",
+                        parse_mode="Markdown"
+                    )
+                    continue
+                    
+                # Store pending update and notify user manually
                 self.pending_updates[container.name] = remote_digest
                 logger.info(f"Update found for {container.name}: {new_image}. Sending notification...")
                 is_stopped = container.status != 'running'

@@ -72,3 +72,9 @@ class ConfigDB:
     def set_ignored_update(self, container_name, digest):
         if digest:
             self.set_config(f'ignore_{container_name}', digest)
+
+    def get_auto_update(self, container_name):
+        return self.get_config(f'autoupdate_{container_name}', '0') == '1'
+
+    def set_auto_update(self, container_name, enable):
+        self.set_config(f'autoupdate_{container_name}', '1' if enable else '0')
