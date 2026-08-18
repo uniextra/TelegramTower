@@ -74,3 +74,6 @@ Click **⚙️ Settings** to open the interactive configuration panel. Alternati
 - **Request Delay:** Wait time between checks (0s, 2s, 5s) to avoid Docker Hub rate limits.
 - **Cleanup Old Image:** Automatically delete old images after a successful update.
 - **Check Stopped:** Include stopped containers in the update checks.
+
+## License
+This project is open source and available under the [MIT License](LICENSE).
