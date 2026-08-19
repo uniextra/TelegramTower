@@ -68,12 +68,22 @@ services:
 ```
 
 ## Settings Configuration
-Once the container starts, it will send a greeting message to your Telegram chat. 
-Click **⚙️ Settings** to open the interactive configuration panel. Alternatively, you can send the `/settings` command to the bot at any time to adjust:
-- **Check Interval:** How often to check for updates (1, 7, or 30 days). *(Note: TelegramTower performs its first check 10 seconds after startup, and then waits the configured interval before the next one).*
+The bot has a robust `/settings` menu built right into Telegram. You can configure:
+- **Check Interval:** How often to check for updates (1, 7, or 30 days).
 - **Request Delay:** Wait time between checks (0s, 2s, 5s) to avoid Docker Hub rate limits.
 - **Cleanup Old Image:** Automatically delete old images after a successful update.
 - **Check Stopped:** Include stopped containers in the update checks.
+- **Quarantine Delay:** Delay update notifications for a specified number of days (1, 3, 5, 7 days) to ensure stability and protect against "day 0" bugs or compromised tags. If an image is updated 3 times rapidly during this period, you will receive a manual review warning.
+
+### Container-Specific Quarantine
+You can override the global Quarantine setting for specific containers by adding the `telegramtower.quarantine` label. Set the value to the number of days to wait, or `0` to bypass the delay entirely:
+```yaml
+services:
+  my_app:
+    image: nginx:latest
+    labels:
+      - "telegramtower.quarantine=5" # Wait 5 days for this specific container
+```
 
 ## License
 This project is open source and available under the [MIT License](LICENSE).
