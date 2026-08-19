@@ -16,6 +16,14 @@ class ConfigDB:
                     value TEXT
                 )
             ''')
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS quarantine_tracking (
+                    container_name TEXT PRIMARY KEY,
+                    detected_digest TEXT,
+                    detected_at TIMESTAMP,
+                    reset_count INTEGER
+                )
+            ''')
             conn.commit()
 
     def set_config(self, key, value):
@@ -78,3 +86,44 @@ class ConfigDB:
 
     def set_auto_update(self, container_name, enable):
         self.set_config(f'autoupdate_{container_name}', '1' if enable else '0')
+
+    # Quarantine methods
+    def get_quarantine_days(self):
+        return int(self.get_config('quarantine_days', 0))
+
+    def set_quarantine_days(self, days):
+        self.set_config('quarantine_days', days)
+
+    def get_quarantine_record(self, container_name):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                'SELECT detected_digest, detected_at, reset_count FROM quarantine_tracking WHERE container_name = ?',
+                (container_name,)
+            )
+            row = cursor.fetchone()
+            if row:
+                return {
+                    'detected_digest': row[0],
+                    'detected_at': row[1],
+                    'reset_count': row[2]
+                }
+            return None
+
+    def update_quarantine_record(self, container_name, digest, reset_count):
+        import datetime
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                INSERT INTO quarantine_tracking (container_name, detected_digest, detected_at, reset_count)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(container_name) DO UPDATE SET 
+                    detected_digest=excluded.detected_digest,
+                    detected_at=excluded.detected_at,
+                    reset_count=excluded.reset_count
+            ''', (container_name, digest, now, reset_count))
+            conn.commit()
+
+    def delete_quarantine_record(self, container_name):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('DELETE FROM quarantine_tracking WHERE container_name = ?', (container_name,))
+            conn.commit()

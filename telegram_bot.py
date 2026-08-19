@@ -34,6 +34,12 @@ STRINGS = {
         'updating_msg': "Updating {container}... please wait.",
         'auto_updating_msg': "Updating {container}... and setting to auto-update in the future.",
         'auto_updated_notification': "🚀 Automatically updated container *{container}* to new image:\n`{image}`",
+        'btn_quarantine': "🛡️ Quarantine Delay",
+        'quarantine_ui': "🛡️ *Quarantine Delay*\n\nCurrently delaying updates for *{days} day(s)*.\n\nSelect a new delay (0 to disable):",
+        'quarantine_warning': "⚠️ *Warning:* Container `{container}` has skipped the quarantine period 3 times due to rapid updates.\n\nPlease check it manually to ensure it's stable.",
+        'day_0': "0 Days (Off)",
+        'days_3': "3 Days",
+        'days_5': "5 Days",
         'update_success_running': "Updated {name} and started successfully.{cleanup}",
         'update_success_stopped': "Updated {name} and recreated successfully (kept stopped).{cleanup}",
         'cleanup_removed': " Old image removed.",
@@ -46,20 +52,26 @@ STRINGS = {
     },
     'es': {
         'startup': "🤖 *¡TelegramTower ha iniciado!*\n\nEstoy listo para monitorizar tus contenedores Docker.",
-        'settings_main': "⚙️ *Menú de Ajustes*\n\n• *Check Interval:* Cada cuánto tiempo verificaré actualizaciones.\n• *Request Delay:* Espera entre comprobaciones para evitar bloqueos por límite de peticiones.\n• *Cleanup Old Image:* Eliminar automáticamente la imagen antigua tras una actualización.\n• *Check Stopped:* Incluir contenedores detenidos en las comprobaciones.",
+        'settings_main': "⚙️ *Menú de Ajustes*\n\n• *Check Interval:* Cada cuánto tiempo verificaré actualizaciones.\n• *Request Delay:* Espera entre comprobaciones para evitar bloqueos por límite de peticiones.\n• *Cleanup Old Image:* Eliminar automáticamente la imagen antigua tras una actualización.\n• *Check Stopped:* Incluir contenedores detenidos en las comprobaciones.\n• *Quarantine:* Esperar X días antes de avisar/actualizar para evitar bugs de Día 0.",
         'settings_btn': "⚙️ Ajustes",
         'btn_interval': "⏱ Intervalo",
         'btn_delay': "⏳ Retraso",
         'btn_cleanup': "🧹 Limpiar Imagen",
         'btn_stopped': "🛑 Detenidos",
+        'btn_quarantine': "🛡️ Cuarentena",
         'interval_ui': "⏱ *Intervalo de Comprobación*\n\nActualmente comprobando cada *{days} día(s)*.\n\nSelecciona el nuevo intervalo:",
         'delay_ui': "⏳ *Retraso de Peticiones*\n\nActualmente esperando *{delay}s* entre contenedores.\n\nSelecciona el nuevo retraso:",
         'cleanup_ui': "🧹 *Limpiar Imagen Antigua*\n\nEstado actual: *{state}*.\n\nSi está activado, borraré la imagen antigua tras actualizar con éxito.",
         'stopped_ui': "🛑 *Comprobar Contenedores Detenidos*\n\nEstado actual: *{state}*.\n\nSi está activado, buscaré actualizaciones en contenedores detenidos. Se mantendrán detenidos tras actualizarse.",
+        'quarantine_ui': "🛡️ *Cuarentena de Actualizaciones*\n\nActualmente retrasando avisos *{days} día(s)*.\n\nSelecciona el nuevo retraso (0 para desactivar):",
+        'quarantine_warning': "⚠️ *Aviso:* El contenedor `{container}` se ha saltado la cuarentena 3 veces por actualizaciones rápidas.\n\nPor favor, revísalo manualmente para asegurar su estabilidad.",
         'btn_back': "🔙 Volver a Ajustes",
         'enabled': "Activado",
         'disabled': "Desactivado",
+        'day_0': "0 Días (Off)",
         'day_1': "1 Día",
+        'days_3': "3 Días",
+        'days_5': "5 Días",
         'days_7': "7 Días",
         'days_30': "30 Días",
         'update_btn': "Actualizar",
@@ -147,7 +159,25 @@ class TelegramBot:
             [InlineKeyboardButton(self.t('btn_interval'), callback_data="menu_set_interval")],
             [InlineKeyboardButton(self.t('btn_delay'), callback_data="menu_set_delay")],
             [InlineKeyboardButton(self.t('btn_cleanup'), callback_data="menu_set_cleanup")],
-            [InlineKeyboardButton(self.t('btn_stopped'), callback_data="menu_set_stopped")]
+            [InlineKeyboardButton(self.t('btn_stopped'), callback_data="menu_set_stopped")],
+            [InlineKeyboardButton(self.t('btn_quarantine'), callback_data="menu_set_quarantine")]
+        ]
+        return msg, InlineKeyboardMarkup(keyboard)
+
+    def _get_quarantine_ui(self):
+        days = self.config_db.get_quarantine_days()
+        msg = self.t('quarantine_ui', days=days)
+        keyboard = [
+            [
+                InlineKeyboardButton(f"{'✅ ' if days == 0 else ''}{self.t('day_0')}", callback_data="set_quarantine_0"),
+                InlineKeyboardButton(f"{'✅ ' if days == 1 else ''}{self.t('day_1')}", callback_data="set_quarantine_1"),
+                InlineKeyboardButton(f"{'✅ ' if days == 3 else ''}{self.t('days_3')}", callback_data="set_quarantine_3")
+            ],
+            [
+                InlineKeyboardButton(f"{'✅ ' if days == 5 else ''}{self.t('days_5')}", callback_data="set_quarantine_5"),
+                InlineKeyboardButton(f"{'✅ ' if days == 7 else ''}{self.t('days_7')}", callback_data="set_quarantine_7")
+            ],
+            [InlineKeyboardButton(self.t('btn_back'), callback_data="menu_main_settings")]
         ]
         return msg, InlineKeyboardMarkup(keyboard)
 
@@ -262,6 +292,10 @@ class TelegramBot:
             msg, markup = self._get_stopped_ui()
             await query.edit_message_text(text=msg, reply_markup=markup, parse_mode="Markdown")
             return
+        elif data == "menu_set_quarantine":
+            msg, markup = self._get_quarantine_ui()
+            await query.edit_message_text(text=msg, reply_markup=markup, parse_mode="Markdown")
+            return
             
         # Setting values
         if data.startswith("set_interval_"):
@@ -290,6 +324,13 @@ class TelegramBot:
             enable = data.endswith("_1")
             self.config_db.set_include_stopped(enable)
             msg, markup = self._get_stopped_ui()
+            await query.edit_message_text(text=msg, reply_markup=markup, parse_mode="Markdown")
+            return
+            
+        if data.startswith("set_quarantine_"):
+            days = int(data.split("_")[-1])
+            self.config_db.set_quarantine_days(days)
+            msg, markup = self._get_quarantine_ui()
             await query.edit_message_text(text=msg, reply_markup=markup, parse_mode="Markdown")
             return
         
@@ -378,8 +419,51 @@ class TelegramBot:
                     logger.info(f"Update for {container.name} was previously ignored. Skipping.")
                     continue
 
-                # Check Auto-update settings
                 labels = getattr(container, 'labels', {})
+
+                # Quarantine Check
+                q_label = labels.get('telegramtower.quarantine')
+                q_days = int(q_label) if q_label and q_label.isdigit() else self.config_db.get_quarantine_days()
+                
+                if q_days > 0:
+                    q_record = self.config_db.get_quarantine_record(container.name)
+                    import datetime
+                    now = datetime.datetime.now(datetime.timezone.utc)
+                    
+                    if not q_record:
+                        logger.info(f"Quarantine tracking started for {container.name} (digest: {remote_digest})")
+                        self.config_db.update_quarantine_record(container.name, remote_digest, 0)
+                        continue
+                    else:
+                        if q_record['detected_digest'] == remote_digest:
+                            detected_at = datetime.datetime.fromisoformat(q_record['detected_at'])
+                            if (now - detected_at).days < q_days:
+                                logger.info(f"Container {container.name} is in quarantine for {(q_days - (now - detected_at).days)} more days. Skipping.")
+                                continue
+                            else:
+                                logger.info(f"Container {container.name} passed {q_days} days quarantine.")
+                                self.config_db.delete_quarantine_record(container.name)
+                        else:
+                            # Digest changed during quarantine! New push detected.
+                            new_count = q_record['reset_count'] + 1
+                            logger.info(f"Container {container.name} digest changed during quarantine. Reset count: {new_count}")
+                            
+                            if new_count >= 3:
+                                logger.warning(f"Container {container.name} skipped quarantine 3 times!")
+                                try:
+                                    await self.application.bot.send_message(
+                                        chat_id=self.chat_id,
+                                        text=self.t('quarantine_warning', container=container.name),
+                                        parse_mode="Markdown"
+                                    )
+                                except Exception as e:
+                                    logger.error(f"Failed to send quarantine warning: {e}")
+                                new_count = 0  # Reset after warning
+                            
+                            self.config_db.update_quarantine_record(container.name, remote_digest, new_count)
+                            continue
+
+                # Check Auto-update settings
                 label_auto = str(labels.get('telegramtower.autoupdate', '')).lower() == 'true'
                 db_auto = self.config_db.get_auto_update(container.name)
                 
