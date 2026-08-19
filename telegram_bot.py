@@ -34,6 +34,12 @@ STRINGS = {
         'updating_msg': "Updating {container}... please wait.",
         'auto_updating_msg': "Updating {container}... and setting to auto-update in the future.",
         'auto_updated_notification': "🚀 Automatically updated container *{container}* to new image:\n`{image}`",
+        'update_success_running': "Updated {name} and started successfully.{cleanup}",
+        'update_success_stopped': "Updated {name} and recreated successfully (kept stopped).{cleanup}",
+        'cleanup_removed': " Old image removed.",
+        'already_up_to_date': "Container {name} is already up to date.",
+        'err_recreate': "Failed to recreate container: {error}",
+        'generic_error': "Error: {error}",
         'not_found_msg': "Container {container} not found.",
         'success': "✅ Success",
         'failed': "❌ Failed"
@@ -65,6 +71,12 @@ STRINGS = {
         'updating_msg': "Actualizando {container}... por favor espera.",
         'auto_updating_msg': "Actualizando {container}... y configurado para actualizarse automáticamente en el futuro.",
         'auto_updated_notification': "🚀 Contenedor *{container}* actualizado automáticamente a la nueva imagen:\n`{image}`",
+        'update_success_running': "Contenedor {name} actualizado e iniciado con éxito.{cleanup}",
+        'update_success_stopped': "Contenedor {name} actualizado y recreado con éxito (mantenido detenido).{cleanup}",
+        'cleanup_removed': " Imagen antigua eliminada.",
+        'already_up_to_date': "El contenedor {name} ya está en la última versión.",
+        'err_recreate': "Error al recrear el contenedor: {error}",
+        'generic_error': "Error: {error}",
         'not_found_msg': "Contenedor {container} no encontrado.",
         'success': "✅ Éxito",
         'failed': "❌ Error"
@@ -98,6 +110,18 @@ class TelegramBot:
         if kwargs:
             return text.format(**kwargs)
         return text
+
+    def format_update_result(self, result):
+        if isinstance(result, tuple) and len(result) == 3:
+            success, key, params = result
+            if key == "update_success":
+                cleanup_str = self.t('cleanup_removed') if params.get('cleaned_up') else ""
+                template_key = 'update_success_running' if params.get('was_running') else 'update_success_stopped'
+                return self.t(template_key, name=params.get('name', ''), cleanup=cleanup_str)
+            return self.t(key, **params)
+        elif isinstance(result, tuple) and len(result) == 2:
+            return result[1]
+        return str(result)
 
     def _update_language(self, update: Update):
         if update.effective_user and update.effective_user.language_code:
@@ -309,7 +333,9 @@ class TelegramBot:
             cleanup = self.config_db.get_cleanup_old_image()
             
             # Execute the heavy update process in a separate thread so it doesn't block the UI
-            success, msg_str = await asyncio.to_thread(self.docker_manager.update_container, target.id, cleanup)
+            result = await asyncio.to_thread(self.docker_manager.update_container, target.id, cleanup)
+            success = result[0]
+            msg_str = self.format_update_result(result)
             
             status = self.t('success') if success else self.t('failed')
             
@@ -360,7 +386,9 @@ class TelegramBot:
                 if label_auto or db_auto:
                     logger.info(f"Auto-updating {container.name}...")
                     cleanup = self.config_db.get_cleanup_old_image()
-                    success, msg_str = await asyncio.to_thread(self.docker_manager.update_container, container.id, cleanup)
+                    result = await asyncio.to_thread(self.docker_manager.update_container, container.id, cleanup)
+                    success = result[0]
+                    msg_str = self.format_update_result(result)
                     status = self.t('success') if success else self.t('failed')
                     
                     if success:

@@ -76,7 +76,7 @@ class DockerManager:
             new_image = self.client.images.pull(image_name)
             
             if old_image_id == new_image.id:
-                return True, f"Container {container.name} is already up to date."
+                return True, "already_up_to_date", {"name": container.name}
 
             container_config = container.attrs['Config']
             host_config = container.attrs['HostConfig']
@@ -129,25 +129,22 @@ class DockerManager:
                         except Exception as net_e:
                             logger.error(f"Failed to connect to additional network {net_name}: {net_e}")
 
-                state_msg = "and started" if is_running else "and left stopped"
-                success_msg = f"Updated {name} {state_msg} successfully."
             except Exception as create_e:
                 logger.error(f"Failed to recreate container {name}: {create_e}")
-                return False, f"Failed to recreate container: {create_e}"
+                return False, "err_recreate", {"error": str(create_e)}
             
             # Cleanup old image
+            cleaned_up = False
             if cleanup_old_image:
                 try:
-                    # Let's check if the container is running and healthy first
-                    # For simplicity, assuming it started correctly
                     self.client.images.remove(old_image_id)
                     logger.info(f"Removed old image {old_image_id}")
-                    success_msg += " Old image removed."
+                    cleaned_up = True
                 except Exception as clean_e:
                     logger.warning(f"Failed to remove old image {old_image_id}: {clean_e}")
                     
-            return True, success_msg
+            return True, "update_success", {"name": name, "was_running": is_running, "cleaned_up": cleaned_up}
             
         except Exception as e:
             logger.error(f"Error updating container {container_id}: {e}")
-            return False, f"Error: {e}"
+            return False, "generic_error", {"error": str(e)}
