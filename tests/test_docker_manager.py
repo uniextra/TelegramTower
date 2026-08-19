@@ -8,25 +8,28 @@ def mock_docker_client(mocker):
     mocker.patch('docker.from_env', return_value=mock_client)
     return mock_client
 
-def test_get_running_containers(mock_docker_client):
+def test_get_containers(mock_docker_client):
     manager = DockerManager()
     manager.client.containers.list.return_value = ["container1", "container2"]
     
-    containers = manager.get_running_containers()
+    containers = manager.get_containers()
     assert len(containers) == 2
     manager.client.containers.list.assert_called_once()
 
 def test_check_for_updates_no_tags(mock_docker_client):
     manager = DockerManager()
     mock_container = MagicMock()
+    mock_container.attrs = {"Config": {"Image": ""}}
     mock_container.image.tags = []
+    mock_container.image.attrs = {}
     
-    assert manager.check_for_updates(mock_container) is None
+    assert manager.check_for_updates(mock_container) == (None, None)
 
 def test_check_for_updates_update_available(mock_docker_client):
     manager = DockerManager()
     
     mock_container = MagicMock()
+    mock_container.attrs = {"Config": {"Image": "myimage:latest"}}
     mock_container.image.tags = ["myimage:latest"]
     mock_container.image.attrs = {"RepoDigests": ["myimage@sha256:oldhash"]}
     
@@ -35,12 +38,13 @@ def test_check_for_updates_update_available(mock_docker_client):
     manager.client.images.get_registry_data.return_value = mock_registry_data
     
     result = manager.check_for_updates(mock_container)
-    assert result == "myimage:latest"
+    assert result == ("myimage:latest", "sha256:newhash")
 
 def test_check_for_updates_no_update(mock_docker_client):
     manager = DockerManager()
     
     mock_container = MagicMock()
+    mock_container.attrs = {"Config": {"Image": "myimage:latest"}}
     mock_container.image.tags = ["myimage:latest"]
     mock_container.image.attrs = {"RepoDigests": ["myimage@sha256:samehash"]}
     
@@ -49,4 +53,4 @@ def test_check_for_updates_no_update(mock_docker_client):
     manager.client.images.get_registry_data.return_value = mock_registry_data
     
     result = manager.check_for_updates(mock_container)
-    assert result is None
+    assert result == (None, None)
