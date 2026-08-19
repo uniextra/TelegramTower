@@ -87,6 +87,10 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("settings", self.settings_command))
         self.application.add_handler(CommandHandler("config", self.settings_command))
         self.application.add_handler(CallbackQueryHandler(self.button_handler))
+        self.application.add_error_handler(self._error_handler)
+
+    async def _error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+        logger.error(f"Exception while handling an update: {context.error}")
 
     def t(self, key, **kwargs):
         lang = self.config_db.get_language()
@@ -207,7 +211,10 @@ class TelegramBot:
     async def button_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         self._update_language(update)
         query = update.callback_query
-        await query.answer()
+        try:
+            await query.answer()
+        except Exception:
+            pass
         data = query.data
         
         # UI Navigation
