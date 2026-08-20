@@ -240,8 +240,22 @@ class TelegramBot:
         msg, reply_markup = self._get_settings_main_ui()
         await update.message.reply_text(text=msg, reply_markup=reply_markup, parse_mode="Markdown")
 
-    async def send_update_notification(self, container_name, new_image, is_stopped=False):
+    async def send_update_notification(self, container_name, new_image, is_stopped=False, remote_info=None):
         """Sends a notification with Inline Keyboard to update or ignore."""
+        state_str = self.t('state_stopped') if is_stopped else ""
+        msg = self.t('update_msg', container=container_name, state=state_str, image=new_image)
+        
+        if remote_info:
+            version = remote_info.get('version')
+            source = remote_info.get('source')
+            lang = self.config_db.get_language()
+            
+            if version:
+                msg += f"\n📦 Version: `{version}`" if lang == 'en' else f"\n📦 Versión: `{version}`"
+            if source:
+                link_text = "Changelog / Source" if lang == 'en' else "Ver código/changelog"
+                msg += f"\n🔗 [{link_text}]({source})"
+                
         keyboard = [
             [
                 InlineKeyboardButton(self.t('update_btn'), callback_data=f"update_{container_name}"),
@@ -252,12 +266,10 @@ class TelegramBot:
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        state_info = self.t('state_stopped') if is_stopped else ""
-        message = self.t('update_msg', container=container_name, state=state_info, image=new_image)
         
         try:
             await self.application.bot.send_message(
-                chat_id=self.chat_id, text=message, reply_markup=reply_markup, parse_mode="Markdown"
+                chat_id=self.chat_id, text=msg, reply_markup=reply_markup, parse_mode="Markdown", disable_web_page_preview=True
             )
         except Exception as e:
             logger.error(f"Failed to send message: {e}")
@@ -411,7 +423,7 @@ class TelegramBot:
                 await asyncio.sleep(delay)
                 
             logger.info(f"Inspecting container {container.name} (status: {container.status})")
-            new_image, remote_digest, remote_created_iso = await asyncio.to_thread(self.docker_manager.check_for_updates, container)
+            new_image, remote_digest, remote_info = await asyncio.to_thread(self.docker_manager.check_for_updates, container)
             
             if new_image and remote_digest:
                 ignored_digest = self.config_db.get_ignored_update(container.name)
@@ -431,6 +443,7 @@ class TelegramBot:
                     
                     now = datetime.datetime.now(datetime.timezone.utc)
                     remote_created_at = None
+                    remote_created_iso = remote_info.get('created') if remote_info else None
                     if remote_created_iso:
                         try:
                             # Replace 'Z' with '+00:00' to parse isoformat correctly in older Pythons
@@ -518,7 +531,7 @@ class TelegramBot:
                 self.pending_updates[container.name] = remote_digest
                 logger.info(f"Update found for {container.name}: {new_image}. Sending notification...")
                 is_stopped = container.status != 'running'
-                await self.send_update_notification(container.name, new_image, is_stopped)
+                await self.send_update_notification(container.name, new_image, is_stopped, remote_info)
             else:
                 logger.info(f"No update for {container.name}")
 

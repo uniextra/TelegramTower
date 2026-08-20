@@ -118,10 +118,10 @@ class RegistryFetcher:
         return manifest
 
     @staticmethod
-    def get_remote_image_created_date(image_name):
+    def get_remote_image_info(image_name):
         """
-        Full flow: parse image -> auth -> manifest -> config blob -> created date.
-        Returns the ISO 8601 created date string, or None if it fails.
+        Full flow: parse image -> auth -> manifest -> config blob.
+        Returns a dict with 'created', 'version', and 'source', or None if it fails.
         """
         registry, repository, tag = RegistryFetcher.parse_image_name(image_name)
         
@@ -147,9 +147,19 @@ class RegistryFetcher:
             
             if blob_resp.status_code == 200:
                 config_json = blob_resp.json()
-                return config_json.get('created')
+                created = config_json.get('created')
+                
+                labels = config_json.get('config', {}).get('Labels') or {}
+                version = labels.get('org.opencontainers.image.version') or labels.get('version')
+                source = labels.get('org.opencontainers.image.source') or labels.get('org.opencontainers.image.url') or labels.get('org.label-schema.vcs-url')
+                
+                return {
+                    'created': created,
+                    'version': version,
+                    'source': source
+                }
                 
         except Exception as e:
-            logger.error(f"Failed to get remote creation date for {image_name}: {e}")
+            logger.error(f"Failed to get remote info for {image_name}: {e}")
             
         return None

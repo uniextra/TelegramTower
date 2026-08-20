@@ -38,10 +38,10 @@ def test_check_for_updates_update_available(mock_docker_client, mocker):
     manager.client.images.get_registry_data.return_value = mock_registry_data
     
     # Mock registry API to avoid network calls during test
-    mocker.patch('registry_api.RegistryFetcher.get_remote_image_created_date', return_value="2026-08-19T04:32:10Z")
+    mocker.patch('registry_api.RegistryFetcher.get_remote_image_info', return_value={"created": "2026-08-19T04:32:10Z", "version": "1.4", "source": "https://github.com/a"})
     
     result = manager.check_for_updates(mock_container)
-    assert result == ("myimage:latest", "sha256:newhash", "2026-08-19T04:32:10Z")
+    assert result == ("myimage:latest", "sha256:newhash", {"created": "2026-08-19T04:32:10Z", "version": "1.4", "source": "https://github.com/a"})
 
 def test_check_for_updates_no_update(mock_docker_client):
     manager = DockerManager()

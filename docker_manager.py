@@ -44,10 +44,10 @@ class DockerManager:
                 local_digest = image.attrs["RepoDigests"][0]
                 # local_digest is like "ubuntu@sha256:..."
                 if remote_digest not in local_digest:
-                    # Digest changed! Now fetch the actual creation date from the registry
+                    # Digest changed! Now fetch the actual creation date and info from the registry
                     from registry_api import RegistryFetcher
-                    remote_created_date = RegistryFetcher.get_remote_image_created_date(image_name)
-                    return image_name, remote_digest, remote_created_date
+                    remote_info = RegistryFetcher.get_remote_image_info(image_name)
+                    return image_name, remote_digest, remote_info
             return None, None, None
         except docker.errors.APIError as e:
             if e.response.status_code == 403:
