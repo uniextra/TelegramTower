@@ -44,18 +44,21 @@ class DockerManager:
                 local_digest = image.attrs["RepoDigests"][0]
                 # local_digest is like "ubuntu@sha256:..."
                 if remote_digest not in local_digest:
-                    return image_name, remote_digest
-            return None, None
+                    # Digest changed! Now fetch the actual creation date from the registry
+                    from registry_api import RegistryFetcher
+                    remote_created_date = RegistryFetcher.get_remote_image_created_date(image_name)
+                    return image_name, remote_digest, remote_created_date
+            return None, None, None
         except docker.errors.APIError as e:
             if e.response.status_code == 403:
                 # Likely a local image or private registry without auth
                 logger.debug(f"Skipping {container.name} ({image_name}): Access forbidden (local or private image).")
             else:
                 logger.error(f"API Error checking updates for {container.name}: {e}")
-            return None, None
+            return None, None, None
         except Exception as e:
             logger.error(f"Error checking updates for {container.name}: {e}")
-            return None, None
+            return None, None, None
 
     def update_container(self, container_id, cleanup_old_image=False):
         """

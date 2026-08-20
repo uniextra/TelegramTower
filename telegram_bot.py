@@ -411,7 +411,7 @@ class TelegramBot:
                 await asyncio.sleep(delay)
                 
             logger.info(f"Inspecting container {container.name} (status: {container.status})")
-            new_image, remote_digest = await asyncio.to_thread(self.docker_manager.check_for_updates, container)
+            new_image, remote_digest, remote_created_iso = await asyncio.to_thread(self.docker_manager.check_for_updates, container)
             
             if new_image and remote_digest:
                 ignored_digest = self.config_db.get_ignored_update(container.name)
@@ -428,17 +428,38 @@ class TelegramBot:
                 if q_days > 0:
                     q_record = self.config_db.get_quarantine_record(container.name)
                     import datetime
+                    
                     now = datetime.datetime.now(datetime.timezone.utc)
+                    remote_created_at = None
+                    if remote_created_iso:
+                        try:
+                            # Replace 'Z' with '+00:00' to parse isoformat correctly in older Pythons
+                            clean_iso = remote_created_iso.replace('Z', '+00:00')
+                            remote_created_at = datetime.datetime.fromisoformat(clean_iso)
+                        except Exception as e:
+                            logger.error(f"Failed to parse remote creation date {remote_created_iso}: {e}")
+                    
+                    if not remote_created_at:
+                        # Fallback to local 'now' if we couldn't fetch remote date
+                        remote_created_at = now
+                        
+                    age_days = (now - remote_created_at).days
+                    is_in_quarantine = age_days < q_days
                     
                     if not q_record:
-                        logger.info(f"Quarantine tracking started for {container.name} (digest: {remote_digest})")
-                        self.config_db.update_quarantine_record(container.name, remote_digest, 0)
-                        continue
+                        # First time seeing this update
+                        if is_in_quarantine:
+                            logger.info(f"Quarantine tracking started for {container.name} (age: {age_days}d, digest: {remote_digest})")
+                            self.config_db.update_quarantine_record(container.name, remote_digest, 0)
+                            continue
+                        else:
+                            # Image is already old enough! No need to quarantine.
+                            logger.info(f"Container {container.name} update is {age_days}d old, bypassing {q_days}d quarantine.")
                     else:
                         if q_record['detected_digest'] == remote_digest:
-                            detected_at = datetime.datetime.fromisoformat(q_record['detected_at'])
-                            if (now - detected_at).days < q_days:
-                                logger.info(f"Container {container.name} is in quarantine for {(q_days - (now - detected_at).days)} more days. Skipping.")
+                            # We are already tracking this exact update
+                            if is_in_quarantine:
+                                logger.info(f"Container {container.name} is in quarantine for {(q_days - age_days)} more days. Skipping.")
                                 continue
                             else:
                                 logger.info(f"Container {container.name} passed {q_days} days quarantine.")
@@ -460,8 +481,14 @@ class TelegramBot:
                                     logger.error(f"Failed to send quarantine warning: {e}")
                                 new_count = 0  # Reset after warning
                             
+                            # Update DB tracking to new digest
                             self.config_db.update_quarantine_record(container.name, remote_digest, new_count)
-                            continue
+                            
+                            if is_in_quarantine:
+                                continue
+                            else:
+                                # New digest is somehow already old enough (unlikely, but handled)
+                                self.config_db.delete_quarantine_record(container.name)
 
                 # Check Auto-update settings
                 label_auto = str(labels.get('telegramtower.autoupdate', '')).lower() == 'true'

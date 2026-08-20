@@ -23,9 +23,9 @@ def test_check_for_updates_no_tags(mock_docker_client):
     mock_container.image.tags = []
     mock_container.image.attrs = {}
     
-    assert manager.check_for_updates(mock_container) == (None, None)
+    assert manager.check_for_updates(mock_container) == (None, None, None)
 
-def test_check_for_updates_update_available(mock_docker_client):
+def test_check_for_updates_update_available(mock_docker_client, mocker):
     manager = DockerManager()
     
     mock_container = MagicMock()
@@ -37,8 +37,11 @@ def test_check_for_updates_update_available(mock_docker_client):
     mock_registry_data.id = "sha256:newhash"
     manager.client.images.get_registry_data.return_value = mock_registry_data
     
+    # Mock registry API to avoid network calls during test
+    mocker.patch('registry_api.RegistryFetcher.get_remote_image_created_date', return_value="2026-08-19T04:32:10Z")
+    
     result = manager.check_for_updates(mock_container)
-    assert result == ("myimage:latest", "sha256:newhash")
+    assert result == ("myimage:latest", "sha256:newhash", "2026-08-19T04:32:10Z")
 
 def test_check_for_updates_no_update(mock_docker_client):
     manager = DockerManager()
@@ -53,4 +56,4 @@ def test_check_for_updates_no_update(mock_docker_client):
     manager.client.images.get_registry_data.return_value = mock_registry_data
     
     result = manager.check_for_updates(mock_container)
-    assert result == (None, None)
+    assert result == (None, None, None)
