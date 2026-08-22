@@ -1,13 +1,15 @@
-import os
 import logging
+import os
+
+from config_db import ConfigDB
 from docker_manager import DockerManager
 from telegram_bot import TelegramBot
-from config_db import ConfigDB
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
 
 def main():
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -30,6 +32,7 @@ def main():
         bot.run()
     except KeyboardInterrupt:
         logger.info("Stopping TelegramTower...")
+
 
 if __name__ == "__main__":
     main()
