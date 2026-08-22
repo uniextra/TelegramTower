@@ -40,6 +40,10 @@ STRINGS = {
         'day_0': "0 Days (Off)",
         'days_3': "3 Days",
         'days_5': "5 Days",
+        'btn_quarantine_list': "📋 View Quarantine List",
+        'quarantine_list_ui': "📋 *Quarantine List*\n\nHere are the containers currently in quarantine:\n\n{list}",
+        'quarantine_list_empty': "No containers are currently in quarantine.",
+        'quarantine_list_item': "• *{name}*: {days} day(s) remaining",
         'update_success_running': "Updated {name} and started successfully.{cleanup}",
         'update_success_stopped': "Updated {name} and recreated successfully (kept stopped).{cleanup}",
         'cleanup_removed': " Old image removed.",
@@ -59,6 +63,10 @@ STRINGS = {
         'btn_cleanup': "🧹 Limpiar Imagen",
         'btn_stopped': "🛑 Detenidos",
         'btn_quarantine': "🛡️ Cuarentena",
+        'btn_quarantine_list': "📋 Ver Lista Cuarentena",
+        'quarantine_list_ui': "📋 *Lista de Cuarentena*\n\nContenedores actualmente en espera:\n\n{list}",
+        'quarantine_list_empty': "No hay contenedores en cuarentena actualmente.",
+        'quarantine_list_item': "• *{name}*: {days} día(s) restante(s)",
         'interval_ui': "⏱ *Intervalo de Comprobación*\n\nActualmente comprobando cada *{days} día(s)*.\n\nSelecciona el nuevo intervalo:",
         'delay_ui': "⏳ *Retraso de Peticiones*\n\nActualmente esperando *{delay}s* entre contenedores.\n\nSelecciona el nuevo retraso:",
         'cleanup_ui': "🧹 *Limpiar Imagen Antigua*\n\nEstado actual: *{state}*.\n\nSi está activado, borraré la imagen antigua tras actualizar con éxito.",
@@ -177,8 +185,40 @@ class TelegramBot:
                 InlineKeyboardButton(f"{'✅ ' if days == 5 else ''}{self.t('days_5')}", callback_data="set_quarantine_5"),
                 InlineKeyboardButton(f"{'✅ ' if days == 7 else ''}{self.t('days_7')}", callback_data="set_quarantine_7")
             ],
+            [InlineKeyboardButton(self.t('btn_quarantine_list'), callback_data="menu_quarantine_list")],
             [InlineKeyboardButton(self.t('btn_back'), callback_data="menu_main_settings")]
         ]
+        return msg, InlineKeyboardMarkup(keyboard)
+
+    def _get_quarantine_list_ui(self):
+        records = self.config_db.get_all_quarantine_records()
+        q_days_global = self.config_db.get_quarantine_days()
+        
+        if not records:
+            msg = self.t('quarantine_list_empty')
+        else:
+            import datetime
+            now = datetime.datetime.now(datetime.timezone.utc)
+            items = []
+            for r in records:
+                name = r['container_name']
+                # Try to use remote_created_iso, fallback to detected_at if not available
+                created_iso = r.get('remote_created_iso') or r.get('detected_at')
+                try:
+                    clean_iso = created_iso.replace('Z', '+00:00')
+                    created_at = datetime.datetime.fromisoformat(clean_iso)
+                    age_days = (now - created_at).days
+                    
+                    # Estimate remaining days based on global setting (we don't fetch container labels here for speed)
+                    remaining = max(0, q_days_global - age_days)
+                    items.append(self.t('quarantine_list_item', name=name, days=remaining))
+                except Exception:
+                    items.append(self.t('quarantine_list_item', name=name, days="?"))
+                    
+            list_str = "\n".join(items)
+            msg = self.t('quarantine_list_ui', list=list_str)
+            
+        keyboard = [[InlineKeyboardButton(self.t('btn_back'), callback_data="menu_set_quarantine")]]
         return msg, InlineKeyboardMarkup(keyboard)
 
     def _get_interval_ui(self):
@@ -306,6 +346,10 @@ class TelegramBot:
             return
         elif data == "menu_set_quarantine":
             msg, markup = self._get_quarantine_ui()
+            await query.edit_message_text(text=msg, reply_markup=markup, parse_mode="Markdown")
+            return
+        elif data == "menu_quarantine_list":
+            msg, markup = self._get_quarantine_list_ui()
             await query.edit_message_text(text=msg, reply_markup=markup, parse_mode="Markdown")
             return
             
@@ -463,7 +507,7 @@ class TelegramBot:
                         # First time seeing this update
                         if is_in_quarantine:
                             logger.info(f"Quarantine tracking started for {container.name} (age: {age_days}d, digest: {remote_digest})")
-                            self.config_db.update_quarantine_record(container.name, remote_digest, 0)
+                            self.config_db.update_quarantine_record(container.name, remote_digest, 0, remote_created_iso)
                             continue
                         else:
                             # Image is already old enough! No need to quarantine.
@@ -495,7 +539,7 @@ class TelegramBot:
                                 new_count = 0  # Reset after warning
                             
                             # Update DB tracking to new digest
-                            self.config_db.update_quarantine_record(container.name, remote_digest, new_count)
+                            self.config_db.update_quarantine_record(container.name, remote_digest, new_count, remote_created_iso)
                             
                             if is_in_quarantine:
                                 continue

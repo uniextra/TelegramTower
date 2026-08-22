@@ -24,6 +24,13 @@ class ConfigDB:
                     reset_count INTEGER
                 )
             ''')
+            
+            # Migration: add remote_created_iso if not exists
+            try:
+                conn.execute('ALTER TABLE quarantine_tracking ADD COLUMN remote_created_iso TEXT')
+            except sqlite3.OperationalError:
+                pass # Column already exists
+                
             conn.commit()
 
     def set_config(self, key, value):
@@ -59,14 +66,14 @@ class ConfigDB:
     def get_cleanup_old_image(self):
         return self.get_config('cleanup_old_image', '1') == '1'
 
-    def set_cleanup_old_image(self, enable):
-        self.set_config('cleanup_old_image', '1' if enable else '0')
+    def set_cleanup_old_image(self, enabled):
+        self.set_config('cleanup_old_image', '1' if enabled else '0')
 
     def get_include_stopped(self):
         return self.get_config('include_stopped', '0') == '1'
 
-    def set_include_stopped(self, enable):
-        self.set_config('include_stopped', '1' if enable else '0')
+    def set_include_stopped(self, enabled):
+        self.set_config('include_stopped', '1' if enabled else '0')
         
     def get_language(self):
         return self.get_config('language', 'en')
@@ -75,17 +82,17 @@ class ConfigDB:
         self.set_config('language', lang)
 
     def get_ignored_update(self, container_name):
-        return self.get_config(f'ignore_{container_name}')
+        return self.get_config(f'ignored_{container_name}')
 
     def set_ignored_update(self, container_name, digest):
         if digest:
-            self.set_config(f'ignore_{container_name}', digest)
+            self.set_config(f'ignored_{container_name}', digest)
 
     def get_auto_update(self, container_name):
-        return self.get_config(f'autoupdate_{container_name}', '0') == '1'
+        return self.get_config(f'auto_{container_name}', '0') == '1'
 
-    def set_auto_update(self, container_name, enable):
-        self.set_config(f'autoupdate_{container_name}', '1' if enable else '0')
+    def set_auto_update(self, container_name, enabled):
+        self.set_config(f'auto_{container_name}', '1' if enabled else '0')
 
     # Quarantine methods
     def get_quarantine_days(self):
@@ -96,31 +103,45 @@ class ConfigDB:
 
     def get_quarantine_record(self, container_name):
         with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                'SELECT detected_digest, detected_at, reset_count FROM quarantine_tracking WHERE container_name = ?',
-                (container_name,)
-            )
+            cursor = conn.execute('SELECT detected_digest, detected_at, reset_count, remote_created_iso FROM quarantine_tracking WHERE container_name = ?', (container_name,))
             row = cursor.fetchone()
             if row:
                 return {
                     'detected_digest': row[0],
                     'detected_at': row[1],
-                    'reset_count': row[2]
+                    'reset_count': row[2],
+                    'remote_created_iso': row[3]
                 }
             return None
 
-    def update_quarantine_record(self, container_name, digest, reset_count):
+    def get_all_quarantine_records(self):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute('SELECT container_name, detected_digest, detected_at, reset_count, remote_created_iso FROM quarantine_tracking')
+            rows = cursor.fetchall()
+            return [
+                {
+                    'container_name': r[0],
+                    'detected_digest': r[1],
+                    'detected_at': r[2],
+                    'reset_count': r[3],
+                    'remote_created_iso': r[4]
+                }
+                for r in rows
+            ]
+
+    def update_quarantine_record(self, container_name, digest, reset_count, remote_created_iso=None):
         import datetime
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         with sqlite3.connect(self.db_path) as conn:
             conn.execute('''
-                INSERT INTO quarantine_tracking (container_name, detected_digest, detected_at, reset_count)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO quarantine_tracking (container_name, detected_digest, detected_at, reset_count, remote_created_iso)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(container_name) DO UPDATE SET 
                     detected_digest=excluded.detected_digest,
                     detected_at=excluded.detected_at,
-                    reset_count=excluded.reset_count
-            ''', (container_name, digest, now, reset_count))
+                    reset_count=excluded.reset_count,
+                    remote_created_iso=excluded.remote_created_iso
+            ''', (container_name, digest, now, reset_count, remote_created_iso))
             conn.commit()
 
     def delete_quarantine_record(self, container_name):
