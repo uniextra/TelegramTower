@@ -163,7 +163,8 @@ class TelegramBot:
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         self._update_language(update)
         msg, reply_markup = self._get_startup_ui()
-        await update.message.reply_text(
+        if update.message:
+            await update.message.reply_text(
             text=msg, reply_markup=reply_markup, parse_mode="Markdown"
         )
 
@@ -390,7 +391,8 @@ class TelegramBot:
     ):
         self._update_language(update)
         msg, reply_markup = self._get_settings_main_ui()
-        await update.message.reply_text(
+        if update.message:
+            await update.message.reply_text(
             text=msg, reply_markup=reply_markup, parse_mode="Markdown"
         )
 
@@ -451,11 +453,13 @@ class TelegramBot:
     async def button_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         self._update_language(update)
         query = update.callback_query
+        if not query:
+            return
         try:
             await query.answer()
-        except Exception:
-            pass
-        data = query.data
+        except Exception as e:
+            logger.debug(f"Failed to answer query: {e}")
+        data = query.data or ''
 
         # UI Navigation
         if data == "menu_main_settings":

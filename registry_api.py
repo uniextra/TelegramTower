@@ -1,5 +1,6 @@
 import logging
 import re
+from typing import Any, Dict, Optional, Tuple
 
 import requests
 
@@ -12,7 +13,7 @@ class RegistryFetcher:
     """
 
     @staticmethod
-    def parse_image_name(image_name):
+    def parse_image_name(image_name: str) -> Tuple[str, str, str]:
         """
         Parses an image name into registry, repository, and tag.
         Handles default Docker Hub registry and library/ prefix.
@@ -40,12 +41,14 @@ class RegistryFetcher:
             repo = "/".join(parts[1:])
 
         if ":" in repo:
-            repo, tag = repo.split(":", 1)
+            repo_parts = repo.split(":", 1)
+            repo = repo_parts[0]
+            tag = repo_parts[1]
 
         return registry, repo, tag
 
     @staticmethod
-    def get_auth_token(registry, repository):
+    def get_auth_token(registry: str, repository: str) -> Optional[str]:
         """
         Retrieves a Bearer token for the given registry and repository by triggering a 401 challenge.
         """
@@ -74,18 +77,19 @@ class RegistryFetcher:
 
                 token_resp = requests.get(realm, params=token_params, timeout=10)
                 if token_resp.status_code == 200:
-                    return token_resp.json().get("token") or token_resp.json().get(
-                        "access_token"
-                    )
+                    data = token_resp.json()
+                    return data.get("token") or data.get("access_token")
             elif resp.status_code == 200:
                 # No auth required
                 return None
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             logger.error(f"Error authenticating with registry {registry}: {e}")
         return None
 
     @staticmethod
-    def fetch_manifest(registry, repository, reference, token):
+    def fetch_manifest(
+        registry: str, repository: str, reference: str, token: Optional[str]
+    ) -> Optional[Dict[str, Any]]:
         """
         Fetches the manifest. Handles multi-arch lists by picking linux/amd64.
         """
@@ -99,41 +103,50 @@ class RegistryFetcher:
             headers["Authorization"] = f"Bearer {token}"
 
         url = f"https://{registry}/v2/{repository}/manifests/{reference}"
-        resp = requests.get(url, headers=headers, timeout=10)
+        try:
+            resp = requests.get(url, headers=headers, timeout=10)
 
-        if resp.status_code != 200:
-            logger.error(
-                f"Failed to fetch manifest for {repository}:{reference} - Status: {resp.status_code}"
-            )
-            return None
+            if resp.status_code != 200:
+                logger.error(
+                    f"Failed to fetch manifest for {repository}:{reference} - Status: {resp.status_code}"
+                )
+                return None
 
-        manifest = resp.json()
-        media_type = manifest.get("mediaType", "")
+            manifest = resp.json()
+            media_type = manifest.get("mediaType", "")
 
-        # If it's a manifest list/index, find the linux/amd64 manifest and fetch it
-        if "manifest.list" in media_type or "image.index" in media_type:
-            manifests = manifest.get("manifests", [])
-            for m in manifests:
-                platform = m.get("platform", {})
-                if (
-                    platform.get("architecture") in ["amd64", "arm64"]
-                    and platform.get("os") == "linux"
-                ):
-                    # Priority to the first matching linux architecture (can be enhanced to match host arch)
+            # If it's a manifest list/index, find the linux/amd64 manifest and fetch it
+            if "manifest.list" in media_type or "image.index" in media_type:
+                manifests = manifest.get("manifests", [])
+                for m in manifests:
+                    platform = m.get("platform", {})
+                    if (
+                        platform.get("architecture") in ["amd64", "arm64"]
+                        and platform.get("os") == "linux"
+                    ):
+                        # Priority to the first matching linux architecture (can be enhanced to match host arch)
+                        digest = m.get("digest")
+                        if digest:
+                            return RegistryFetcher.fetch_manifest(
+                                registry, repository, digest, token
+                            )
+
+                # Fallback to first if linux not found
+                if manifests and manifests[0].get("digest"):
                     return RegistryFetcher.fetch_manifest(
-                        registry, repository, m.get("digest"), token
+                        registry, repository, manifests[0]["digest"], token
                     )
 
-            # Fallback to first if linux not found
-            if manifests:
-                return RegistryFetcher.fetch_manifest(
-                    registry, repository, manifests[0].get("digest"), token
-                )
-
-        return manifest
+            return manifest
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request error fetching manifest for {repository}:{reference}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error parsing manifest for {repository}:{reference}: {e}")
+            return None
 
     @staticmethod
-    def get_remote_image_info(image_name):
+    def get_remote_image_info(image_name: str) -> Optional[Dict[str, Any]]:
         """
         Full flow: parse image -> auth -> manifest -> config blob.
         Returns a dict with 'created', 'version', and 'source', or None if it fails.
@@ -176,6 +189,8 @@ class RegistryFetcher:
 
                 return {"created": created, "version": version, "source": source}
 
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error getting remote info for {image_name}: {e}")
         except Exception as e:
             logger.error(f"Failed to get remote info for {image_name}: {e}")
 

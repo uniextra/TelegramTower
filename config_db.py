@@ -1,15 +1,16 @@
 import os
 import sqlite3
+from typing import Any, Dict, List, Optional
 
 
 class ConfigDB:
-    def __init__(self, db_path="data/config.db"):
+    def __init__(self, db_path: str = "data/config.db") -> None:
         self.db_path = db_path
         # Ensure directory exists
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._init_db()
 
-    def _init_db(self):
+    def _init_db(self) -> None:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS config (
@@ -36,7 +37,7 @@ class ConfigDB:
 
             conn.commit()
 
-    def set_config(self, key, value):
+    def set_config(self, key: str, value: Any) -> None:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 """
@@ -48,7 +49,7 @@ class ConfigDB:
             )
             conn.commit()
 
-    def get_config(self, key, default=None):
+    def get_config(self, key: str, default: Any = None) -> Any:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("SELECT value FROM config WHERE key = ?", (key,))
             row = cursor.fetchone()
@@ -57,57 +58,57 @@ class ConfigDB:
             return default
 
     # Helpers
-    def get_poll_interval_days(self):
+    def get_poll_interval_days(self) -> int:
         return int(self.get_config("poll_interval_days", 1))
 
-    def set_poll_interval_days(self, days):
+    def set_poll_interval_days(self, days: int) -> None:
         self.set_config("poll_interval_days", days)
 
-    def get_request_delay_seconds(self):
+    def get_request_delay_seconds(self) -> int:
         return int(self.get_config("request_delay_seconds", 0))
 
-    def set_request_delay_seconds(self, seconds):
+    def set_request_delay_seconds(self, seconds: int) -> None:
         self.set_config("request_delay_seconds", seconds)
 
-    def get_cleanup_old_image(self):
+    def get_cleanup_old_image(self) -> bool:
         return self.get_config("cleanup_old_image", "1") == "1"
 
-    def set_cleanup_old_image(self, enabled):
+    def set_cleanup_old_image(self, enabled: bool) -> None:
         self.set_config("cleanup_old_image", "1" if enabled else "0")
 
-    def get_include_stopped(self):
+    def get_include_stopped(self) -> bool:
         return self.get_config("include_stopped", "0") == "1"
 
-    def set_include_stopped(self, enabled):
+    def set_include_stopped(self, enabled: bool) -> None:
         self.set_config("include_stopped", "1" if enabled else "0")
 
-    def get_language(self):
+    def get_language(self) -> str:
         return self.get_config("language", "en")
 
-    def set_language(self, lang):
+    def set_language(self, lang: str) -> None:
         self.set_config("language", lang)
 
-    def get_ignored_update(self, container_name):
+    def get_ignored_update(self, container_name: str) -> Optional[str]:
         return self.get_config(f"ignored_{container_name}")
 
-    def set_ignored_update(self, container_name, digest):
+    def set_ignored_update(self, container_name: str, digest: str) -> None:
         if digest:
             self.set_config(f"ignored_{container_name}", digest)
 
-    def get_auto_update(self, container_name):
+    def get_auto_update(self, container_name: str) -> bool:
         return self.get_config(f"auto_{container_name}", "0") == "1"
 
-    def set_auto_update(self, container_name, enabled):
+    def set_auto_update(self, container_name: str, enabled: bool) -> None:
         self.set_config(f"auto_{container_name}", "1" if enabled else "0")
 
     # Quarantine methods
-    def get_quarantine_days(self):
+    def get_quarantine_days(self) -> int:
         return int(self.get_config("quarantine_days", 0))
 
-    def set_quarantine_days(self, days):
+    def set_quarantine_days(self, days: int) -> None:
         self.set_config("quarantine_days", days)
 
-    def get_quarantine_record(self, container_name):
+    def get_quarantine_record(self, container_name: str) -> Optional[Dict[str, Any]]:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
                 "SELECT detected_digest, detected_at, reset_count, remote_created_iso FROM quarantine_tracking WHERE container_name = ?",
@@ -123,7 +124,7 @@ class ConfigDB:
                 }
             return None
 
-    def get_all_quarantine_records(self):
+    def get_all_quarantine_records(self) -> List[Dict[str, Any]]:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
                 "SELECT container_name, detected_digest, detected_at, reset_count, remote_created_iso FROM quarantine_tracking"
@@ -141,8 +142,12 @@ class ConfigDB:
             ]
 
     def update_quarantine_record(
-        self, container_name, digest, reset_count, remote_created_iso=None
-    ):
+        self,
+        container_name: str,
+        digest: str,
+        reset_count: int,
+        remote_created_iso: Optional[str] = None,
+    ) -> None:
         import datetime
 
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -161,7 +166,7 @@ class ConfigDB:
             )
             conn.commit()
 
-    def delete_quarantine_record(self, container_name):
+    def delete_quarantine_record(self, container_name: str) -> None:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 "DELETE FROM quarantine_tracking WHERE container_name = ?",

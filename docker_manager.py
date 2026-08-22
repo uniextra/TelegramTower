@@ -1,19 +1,24 @@
 import logging
+from typing import Any, Dict, List, Optional, Tuple
 
 import docker
+from docker.errors import APIError, DockerException, NotFound
+from docker.models.containers import Container
 
 logger = logging.getLogger(__name__)
 
 
 class DockerManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self.client = docker.from_env()
 
-    def get_containers(self, include_stopped=False):
+    def get_containers(self, include_stopped: bool = False) -> List[Container]:
         """Returns a list of containers."""
         return self.client.containers.list(all=include_stopped)
 
-    def check_for_updates(self, container):
+    def check_for_updates(
+        self, container: Container
+    ) -> Tuple[Optional[str], Optional[str], Optional[Dict[str, Any]]]:
         """
         Checks if a newer image exists for the given container on the registry.
         Returns the new image tag/digest if an update is available, else None.
@@ -25,7 +30,7 @@ class DockerManager:
             == "false"
         ):
             logger.info(f"Skipping container {container.name} due to disable label.")
-            return None, None
+            return None, None, None
 
         image = container.image
         # Get the actual image name used to start the container
@@ -45,7 +50,7 @@ class DockerManager:
             # Let's just return True for now to simulate an update if the digest doesn't match
             # For a more robust approach, we need to inspect RepoDigests.
 
-            if image.attrs.get("RepoDigests"):
+            if image and image.attrs.get("RepoDigests"):
                 local_digest = image.attrs["RepoDigests"][0]
                 # local_digest is like "ubuntu@sha256:..."
                 if remote_digest not in local_digest:
@@ -55,8 +60,8 @@ class DockerManager:
                     remote_info = RegistryFetcher.get_remote_image_info(image_name)
                     return image_name, remote_digest, remote_info
             return None, None, None
-        except docker.errors.APIError as e:
-            if e.response.status_code == 403:
+        except APIError as e:
+            if e.response is not None and e.response.status_code == 403:
                 # Likely a local image or private registry without auth
                 logger.debug(
                     f"Skipping {container.name} ({image_name}): Access forbidden (local or private image)."
@@ -64,14 +69,16 @@ class DockerManager:
             else:
                 logger.error(f"API Error checking updates for {container.name}: {e}")
             return None, None, None
-        except Exception as e:
-            logger.error(f"Error checking updates for {container.name}: {e}")
+        except DockerException as e:
+            logger.error(f"Docker Exception checking updates for {container.name}: {e}")
             return None, None, None
 
-    def update_container(self, container_id, cleanup_old_image=False):
+    def update_container(
+        self, container_id: str, cleanup_old_image: bool = False
+    ) -> Tuple[bool, str, Dict[str, Any]]:
         """
         Pulls the new image, stops the container, recreates it, and optionally cleans up the old image.
-        Returns a tuple (success: bool, message: str)
+        Returns a tuple (success: bool, message_key: str, params: dict)
         """
         try:
             container = self.client.containers.get(container_id)
@@ -80,13 +87,13 @@ class DockerManager:
                 if ":" not in image_name:
                     image_name += ":latest"
 
-            old_image_id = container.image.id
+            old_image_id = container.image.id if container.image else None
             is_running = container.status == "running"
 
             logger.info(f"Pulling latest image for {image_name}")
             new_image = self.client.images.pull(image_name)
 
-            if old_image_id == new_image.id:
+            if new_image and old_image_id == new_image.id:
                 return True, "already_up_to_date", {"name": container.name}
 
             container_config = container.attrs["Config"]
@@ -111,22 +118,22 @@ class DockerManager:
                 # Handle networks
                 networks = container.attrs["NetworkSettings"].get("Networks", {})
                 primary_network = (
-                    list(networks.keys())[0]
+                    next(iter(networks.keys()))
                     if networks
                     else host_config.get("NetworkMode")
                 )
 
-                kwargs = dict(
-                    image=image_name,
-                    name=name,
-                    command=container_config.get("Cmd"),
-                    environment=container_config.get("Env"),
-                    volumes=host_config.get("Binds"),
-                    ports=host_config.get("PortBindings"),
-                    network=primary_network,
-                    restart_policy=host_config.get("RestartPolicy"),
-                    labels=labels,
-                )
+                kwargs = {
+                    "image": image_name,
+                    "name": name,
+                    "command": container_config.get("Cmd"),
+                    "environment": container_config.get("Env"),
+                    "volumes": host_config.get("Binds"),
+                    "ports": host_config.get("PortBindings"),
+                    "network": primary_network,
+                    "restart_policy": host_config.get("RestartPolicy"),
+                    "labels": labels,
+                }
 
                 if is_running:
                     new_container = self.client.containers.run(detach=True, **kwargs)
@@ -145,12 +152,12 @@ class DockerManager:
                         try:
                             net = self.client.networks.get(net_name)
                             net.connect(new_container)
-                        except Exception as net_e:
+                        except APIError as net_e:
                             logger.error(
                                 f"Failed to connect to additional network {net_name}: {net_e}"
                             )
 
-            except Exception as create_e:
+            except APIError as create_e:
                 logger.error(f"Failed to recreate container {name}: {create_e}")
                 return False, "err_recreate", {"error": str(create_e)}
 
@@ -158,10 +165,10 @@ class DockerManager:
             cleaned_up = False
             if cleanup_old_image:
                 try:
-                    self.client.images.remove(old_image_id)
+                    self.client.images.remove(str(old_image_id))
                     logger.info(f"Removed old image {old_image_id}")
                     cleaned_up = True
-                except Exception as clean_e:
+                except APIError as clean_e:
                     logger.warning(
                         f"Failed to remove old image {old_image_id}: {clean_e}"
                     )
@@ -172,6 +179,9 @@ class DockerManager:
                 {"name": name, "was_running": is_running, "cleaned_up": cleaned_up},
             )
 
-        except Exception as e:
+        except NotFound as e:
+            logger.error(f"Container {container_id} not found: {e}")
+            return False, "not_found_msg", {"container": container_id}
+        except DockerException as e:
             logger.error(f"Error updating container {container_id}: {e}")
             return False, "generic_error", {"error": str(e)}
