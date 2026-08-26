@@ -271,9 +271,16 @@ class TelegramBot:
 
                     # Estimate remaining days based on global setting (we don't fetch container labels here for speed)
                     remaining = max(0, q_days_global - age_days)
-                    items.append(
-                        self.t("quarantine_list_item", name=name, days=remaining)
-                    )
+                    
+                    item_text = self.t("quarantine_list_item", name=name, days=remaining)
+                    
+                    if self.config_db.get_auto_update(name):
+                        item_text += " 🔄"
+                        
+                    if r.get("reset_count", 0) > 0:
+                        item_text += " ⚠️"
+                        
+                    items.append(item_text)
                 except Exception:
                     items.append(self.t("quarantine_list_item", name=name, days="?"))
 
@@ -734,7 +741,7 @@ class TelegramBot:
                                 f"Container {container.name} digest changed during quarantine. Reset count: {new_count}"
                             )
 
-                            if new_count >= 3:
+                            if new_count > 0 and new_count % 3 == 0:
                                 logger.warning(
                                     f"Container {container.name} skipped quarantine 3 times!"
                                 )
@@ -751,7 +758,6 @@ class TelegramBot:
                                     logger.error(
                                         f"Failed to send quarantine warning: {e}"
                                     )
-                                new_count = 0  # Reset after warning
 
                             # Update DB tracking to new digest
                             self.config_db.update_quarantine_record(
@@ -812,6 +818,7 @@ class TelegramBot:
                 )
             else:
                 logger.info(f"No update for {container.name}")
+                self.config_db.delete_quarantine_record(container.name)
 
     async def _send_startup_message(self, context: ContextTypes.DEFAULT_TYPE):
         msg, reply_markup = self._get_startup_ui()
