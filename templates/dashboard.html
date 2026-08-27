@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TelegramTower Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800 p-6">
+
+    <div class="max-w-6xl mx-auto">
+        <header class="flex items-center justify-between mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">TelegramTower</h1>
+                <p class="text-sm text-gray-500 mt-1">Global Quarantine Setting: {{ q_days_global }} days</p>
+            </div>
+            <div class="text-sm bg-blue-100 text-blue-800 py-1 px-3 rounded-full font-medium shadow-sm">
+                {{ containers|length }} Containers
+            </div>
+        </header>
+
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <table class="min-w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider border-b border-gray-200">
+                        <th class="py-4 px-6 font-semibold">Container</th>
+                        <th class="py-4 px-6 font-semibold">Image</th>
+                        <th class="py-4 px-6 font-semibold">Status</th>
+                        <th class="py-4 px-6 font-semibold text-center">Auto-Update</th>
+                        <th class="py-4 px-6 font-semibold">Quarantine Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 text-sm">
+                    {% for c in containers %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="py-4 px-6 font-medium text-gray-900 flex items-center">
+                            <svg class="w-5 h-5 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                            {{ c.name }}
+                        </td>
+                        <td class="py-4 px-6 text-gray-600 truncate max-w-xs" title="{{ c.image }}">
+                            {{ c.image }}
+                        </td>
+                        <td class="py-4 px-6">
+                            {% if c.status == 'running' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    Running
+                                </span>
+                            {% elif c.status == 'exited' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    Exited
+                                </span>
+                            {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                    {{ c.status }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="py-4 px-6 text-center">
+                            {% if c.auto_update %}
+                                <span class="text-green-500 text-lg" title="Auto-Update Enabled">🔄</span>
+                            {% else %}
+                                <span class="text-gray-300 text-lg" title="Auto-Update Disabled">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-4 px-6">
+                            {% if c.quarantine %}
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-yellow-100 text-yellow-800 py-1 px-2 rounded text-xs font-medium border border-yellow-200">
+                                        {{ c.quarantine.remaining }} days left
+                                    </span>
+                                    {% if c.quarantine.has_warning %}
+                                    <span class="text-red-500 text-lg" title="Fast update detected during quarantine!">⚠️</span>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span class="text-gray-400 italic text-xs">Not in quarantine</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <footer class="mt-8 text-center text-gray-500 text-sm">
+            Powered by TelegramTower
+        </footer>
+    </div>
+</body>
+</html>

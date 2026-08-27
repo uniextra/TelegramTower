@@ -11,6 +11,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+import threading
+
+from web_server import start_web_server
+
+
 def main():
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
@@ -24,6 +29,12 @@ def main():
 
     logger.info("Initializing Docker Manager...")
     docker_manager = DockerManager()
+
+    logger.info("Initializing Web Dashboard Thread...")
+    web_thread = threading.Thread(
+        target=start_web_server, args=(docker_manager, config_db), daemon=True
+    )
+    web_thread.start()
 
     logger.info("Initializing Telegram Bot...")
     bot = TelegramBot(bot_token, chat_id, docker_manager, config_db)
