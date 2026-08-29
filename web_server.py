@@ -62,6 +62,12 @@ def dashboard() -> Any:
                 config_db.set_cleanup_old_image(request.form.get("cleanup_old_image") == "on")
                 config_db.set_include_stopped(request.form.get("include_stopped") == "on")
                 config_db.set_quarantine_days(int(request.form.get("quarantine_days", 0)))
+                
+                config_db.set_events_enabled(request.form.get("events_enabled") == "on")
+                config_db.set_events_notify_start(request.form.get("events_notify_start") == "on")
+                config_db.set_events_notify_stop(request.form.get("events_notify_stop") == "on")
+                config_db.set_events_notify_health(request.form.get("events_notify_health") == "on")
+                config_db.set_events_whitelist_only(request.form.get("events_whitelist_only") == "on")
             elif action == "toggle_auto_update":
                 container_name = request.form.get("container_name")
                 if container_name:
@@ -90,6 +96,11 @@ def dashboard() -> Any:
             "cleanup_old_image": config_db.get_cleanup_old_image(),
             "include_stopped": config_db.get_include_stopped(),
             "quarantine_days": q_days_global,
+            "events_enabled": config_db.get_events_enabled(),
+            "events_notify_start": config_db.get_events_notify_start(),
+            "events_notify_stop": config_db.get_events_notify_stop(),
+            "events_notify_health": config_db.get_events_notify_health(),
+            "events_whitelist_only": config_db.get_events_whitelist_only(),
         }
 
         data = []

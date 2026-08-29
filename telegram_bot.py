@@ -873,3 +873,17 @@ class TelegramBot:
             self._check_containers_job, interval=interval_seconds, first=10
         )
         self.application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+    # --- Event Monitor Callback ---
+    async def _send_event_msg_job(self, context: ContextTypes.DEFAULT_TYPE):
+        msg = context.job.data
+        try:
+            await context.bot.send_message(
+                chat_id=self.chat_id, text=msg, parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.error(f"Failed to send event message: {e}")
+
+    def handle_event_sync(self, name: str, event_type: str, msg: str):
+        if self.application and self.application.job_queue:
+            self.application.job_queue.run_once(self._send_event_msg_job, when=0, data=msg)

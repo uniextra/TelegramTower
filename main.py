@@ -42,10 +42,17 @@ def main():
     logger.info("Initializing Telegram Bot...")
     bot = TelegramBot(bot_token, chat_id, docker_manager, config_db)
 
+    from event_monitor import EventMonitor
+    logger.info("Initializing Docker Event Monitor...")
+    event_monitor = EventMonitor(config_db, bot.handle_event_sync)
+    event_monitor.start()
+
     try:
         bot.run()
     except KeyboardInterrupt:
         logger.info("Stopping TelegramTower...")
+    finally:
+        event_monitor.stop()
 
 
 if __name__ == "__main__":

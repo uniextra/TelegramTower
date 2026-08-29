@@ -127,6 +127,21 @@ class ConfigDB:
             conn.execute("DELETE FROM config WHERE key = ?", (f"snooze_{container_name}",))
             conn.commit()
 
+    def get_events_enabled(self) -> bool: return self.get_config("events_enabled", "1") == "1"
+    def set_events_enabled(self, enabled: bool) -> None: self.set_config("events_enabled", "1" if enabled else "0")
+
+    def get_events_notify_start(self) -> bool: return self.get_config("events_notify_start", "0") == "1"
+    def set_events_notify_start(self, enabled: bool) -> None: self.set_config("events_notify_start", "1" if enabled else "0")
+
+    def get_events_notify_stop(self) -> bool: return self.get_config("events_notify_stop", "1") == "1"
+    def set_events_notify_stop(self, enabled: bool) -> None: self.set_config("events_notify_stop", "1" if enabled else "0")
+
+    def get_events_notify_health(self) -> bool: return self.get_config("events_notify_health", "1") == "1"
+    def set_events_notify_health(self, enabled: bool) -> None: self.set_config("events_notify_health", "1" if enabled else "0")
+    
+    def get_events_whitelist_only(self) -> bool: return self.get_config("events_whitelist_only", "0") == "1"
+    def set_events_whitelist_only(self, enabled: bool) -> None: self.set_config("events_whitelist_only", "1" if enabled else "0")
+
     def get_bot_token(self) -> Optional[str]:
         return self.get_config("bot_token")
 

@@ -105,7 +105,7 @@
                             </div>
                         </div>
 
-                        <div class="flex items-center space-x-6 pt-2">
+                        <div class="flex flex-wrap items-center gap-x-6 gap-y-3 pt-2">
                             <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
                                 <input type="checkbox" name="cleanup_old_image" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.cleanup_old_image %}checked{% endif %}>
                                 <span>Cleanup Old Images</span>
@@ -114,6 +114,39 @@
                                 <input type="checkbox" name="include_stopped" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.include_stopped %}checked{% endif %}>
                                 <span>Check Stopped</span>
                             </label>
+                        </div>
+                        
+                        <!-- Event Notifications Section -->
+                        <div class="mt-4 pt-4 border-t border-zinc-100">
+                            <div class="flex items-center justify-between mb-3">
+                                <div>
+                                    <h4 class="text-sm font-medium text-zinc-900">Live Event Notifications</h4>
+                                    <p class="text-xs text-zinc-500">Monitor real-time Docker events via Telegram</p>
+                                </div>
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
+                                    <input type="checkbox" name="events_enabled" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_enabled %}checked{% endif %}>
+                                    <span>Enable Events</span>
+                                </label>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-3 pl-2 opacity-90">
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
+                                    <input type="checkbox" name="events_notify_start" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_notify_start %}checked{% endif %}>
+                                    <span>Notify on Start</span>
+                                </label>
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
+                                    <input type="checkbox" name="events_notify_stop" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_notify_stop %}checked{% endif %}>
+                                    <span>Notify on Crash/Stop</span>
+                                </label>
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
+                                    <input type="checkbox" name="events_notify_health" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_notify_health %}checked{% endif %}>
+                                    <span>Notify Health Changes</span>
+                                </label>
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium text-indigo-700" title="Only monitor containers labeled with telegram-notifier.monitor=true">
+                                    <input type="checkbox" name="events_whitelist_only" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_whitelist_only %}checked{% endif %}>
+                                    <span>Whitelist Only</span>
+                                </label>
+                            </div>
                         </div>
                         
                         <div class="pt-2">
