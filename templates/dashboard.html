@@ -142,9 +142,14 @@
                                     <input type="checkbox" name="events_notify_health" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_notify_health %}checked{% endif %}>
                                     <span>Notify Health Changes</span>
                                 </label>
-                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium text-indigo-700" title="Only monitor containers labeled with telegram-notifier.monitor=true">
-                                    <input type="checkbox" name="events_whitelist_only" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_whitelist_only %}checked{% endif %}>
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium {% if settings.env_only_whitelist %}text-zinc-400{% else %}text-indigo-700{% endif %}" title="Only monitor containers labeled with telegram-notifier.monitor=true">
+                                    <input type="checkbox" name="events_whitelist_only" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_whitelist_only %}checked{% endif %} {% if settings.env_only_whitelist %}disabled{% endif %}>
                                     <span>Whitelist Only</span>
+                                    {% if settings.env_only_whitelist %}
+                                    <span class="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800" title="Forced by ONLY_WHITELIST environment variable">ENV OVERRIDE</span>
+                                    <!-- Send hidden value so it doesn't get cleared by disabled state if the form saves -->
+                                    <input type="hidden" name="events_whitelist_only" value="on">
+                                    {% endif %}
                                 </label>
                             </div>
                         </div>

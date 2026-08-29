@@ -24,7 +24,9 @@ class EventMonitor:
             self._thread.join(timeout=2.0)
 
     def _should_monitor(self, labels):
-        whitelist_only = self.config_db.get_events_whitelist_only()
+        import os
+        env_whitelist = os.environ.get("ONLY_WHITELIST", "").lower() == "true"
+        whitelist_only = self.config_db.get_events_whitelist_only() or env_whitelist
         
         # Check standard watchtower/telegramtower enable labels first (for strict disable)
         # However, as discussed with the user, we want to separate events from updates.

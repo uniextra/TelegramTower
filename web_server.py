@@ -57,11 +57,15 @@ def dashboard() -> Any:
                 else:
                     config_db.set_bot_token("")
             elif action == "save_global_settings":
-                config_db.set_poll_interval_days(int(request.form.get("poll_interval_days", 1)))
-                config_db.set_request_delay_seconds(int(request.form.get("request_delay_seconds", 0)))
+                try:
+                    config_db.set_poll_interval_days(int(request.form.get("poll_interval_days") or 1))
+                    config_db.set_request_delay_seconds(int(request.form.get("request_delay_seconds") or 0))
+                    config_db.set_quarantine_days(int(request.form.get("quarantine_days") or 0))
+                except ValueError:
+                    pass
+                
                 config_db.set_cleanup_old_image(request.form.get("cleanup_old_image") == "on")
                 config_db.set_include_stopped(request.form.get("include_stopped") == "on")
-                config_db.set_quarantine_days(int(request.form.get("quarantine_days", 0)))
                 
                 config_db.set_events_enabled(request.form.get("events_enabled") == "on")
                 config_db.set_events_notify_start(request.form.get("events_notify_start") == "on")
@@ -89,6 +93,7 @@ def dashboard() -> Any:
         
         env_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
         db_token = config_db.get_bot_token() or ""
+        env_only_whitelist = os.environ.get("ONLY_WHITELIST", "").lower() == "true"
 
         settings = {
             "poll_interval_days": config_db.get_poll_interval_days(),
@@ -100,7 +105,8 @@ def dashboard() -> Any:
             "events_notify_start": config_db.get_events_notify_start(),
             "events_notify_stop": config_db.get_events_notify_stop(),
             "events_notify_health": config_db.get_events_notify_health(),
-            "events_whitelist_only": config_db.get_events_whitelist_only(),
+            "events_whitelist_only": config_db.get_events_whitelist_only() or env_only_whitelist,
+            "env_only_whitelist": env_only_whitelist,
         }
 
         data = []
