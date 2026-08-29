@@ -5,136 +5,145 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TelegramTower Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            },
+          }
+        }
+      }
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .tooltip {
-            position: relative;
-            display: inline-block;
-        }
-        .tooltip .tooltiptext {
-            visibility: hidden;
-            width: 280px;
-            background-color: #333;
-            color: #fff;
-            text-align: center;
-            border-radius: 6px;
-            padding: 5px 10px;
-            position: absolute;
-            z-index: 1;
-            bottom: 125%;
-            left: 50%;
-            margin-left: -140px;
-            opacity: 0;
-            transition: opacity 0.3s;
-            font-size: 0.75rem;
-            font-weight: normal;
-        }
-        .tooltip:hover .tooltiptext {
-            visibility: visible;
-            opacity: 1;
-        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen text-gray-800 p-6">
+<body class="bg-zinc-50 min-h-screen text-zinc-950 font-sans antialiased p-6 md:p-10 selection:bg-zinc-200">
 
-    <div class="max-w-6xl mx-auto">
-        <header class="flex items-center justify-between mb-8">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900">TelegramTower</h1>
-                <p class="text-sm text-gray-500 mt-1">Global Quarantine Setting: {{ q_days_global }} days</p>
+    <div class="max-w-6xl mx-auto space-y-8">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div class="space-y-1.5">
+                <h1 class="text-3xl font-bold tracking-tight text-zinc-950">TelegramTower</h1>
+                <p class="text-sm text-zinc-500 font-medium">Global Quarantine Setting: <span class="text-zinc-900">{{ q_days_global }} days</span></p>
             </div>
-            <div class="text-sm bg-blue-100 text-blue-800 py-1 px-3 rounded-full font-medium shadow-sm">
+            <div class="inline-flex items-center rounded-full border border-zinc-200 bg-white px-3 py-1 text-sm font-medium text-zinc-900 shadow-sm transition-colors hover:bg-zinc-50">
                 {{ containers|length }} Containers
             </div>
         </header>
 
         <!-- Configuration Section -->
-        <div class="bg-white rounded-lg shadow-md overflow-hidden mb-8 p-6">
-            <h2 class="text-lg font-semibold text-gray-800 mb-4">Bot Configuration</h2>
-            <form method="POST" action="/" class="flex items-end space-x-4">
-                <div class="flex-grow">
-                    <label for="bot_token" class="block text-sm font-medium text-gray-700 mb-1">
-                        Telegram Bot Token
+        <div class="rounded-xl border border-zinc-200 bg-white shadow-sm text-zinc-950">
+            <div class="flex flex-col space-y-1.5 p-6 pb-4">
+                <h3 class="font-semibold leading-none tracking-tight text-lg">Bot Configuration</h3>
+                <p class="text-sm text-zinc-500">Update your Telegram Bot Token. Settings saved here override environment variables.</p>
+            </div>
+            <div class="p-6 pt-0">
+                <form method="POST" action="/" class="flex flex-col sm:flex-row max-w-2xl items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-3">
+                    <div class="relative flex-grow w-full">
                         {% if env_token and db_token and env_token != db_token %}
-                            <span class="tooltip text-amber-500 text-lg cursor-help ml-2">⚠️
-                                <span class="tooltiptext">El token usado es el de la web. Se recomienda usar solo uno (web o variable de entorno) para evitar conflictos.</span>
-                            </span>
+                        <div class="absolute right-3 top-1/2 -translate-y-1/2 group cursor-help z-10 flex items-center">
+                            <span class="text-amber-500 text-sm drop-shadow-sm">⚠️</span>
+                            <div class="absolute bottom-full right-0 mb-2 hidden w-64 rounded-md border border-zinc-200 bg-white p-3 text-xs text-zinc-700 shadow-lg group-hover:block transition-all">
+                                <strong>Conflict Detected:</strong> El token usado es el de la web. Se recomienda usar solo uno (web o variable de entorno) para evitar conflictos.
+                            </div>
+                        </div>
                         {% endif %}
-                    </label>
-                    <input type="text" name="bot_token" id="bot_token" value="{{ db_token or env_token }}" placeholder="Enter bot token..." class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-3 py-2 border">
-                </div>
-                <div>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md shadow-sm transition-colors text-sm">Save Token</button>
-                </div>
-            </form>
-            <p class="text-xs text-gray-500 mt-2">Note: Saving a new token here will override the TELEGRAM_BOT_TOKEN environment variable. You must restart the container for token changes to take effect.</p>
+                        <input type="text" name="bot_token" id="bot_token" value="{{ db_token or env_token }}" placeholder="Enter Telegram Bot Token..." 
+                               class="flex h-10 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+                    </div>
+                    <button type="submit" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 h-10 px-6 py-2 shadow-sm w-full sm:w-auto">
+                        Save Token
+                    </button>
+                </form>
+                <p class="text-[13px] text-zinc-500 mt-3 flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Remember to restart the container for token changes to take effect.
+                </p>
+            </div>
         </div>
 
-        <div class="bg-white rounded-lg shadow-md overflow-hidden">
-            <table class="min-w-full text-left border-collapse">
-                <thead>
-                    <tr class="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider border-b border-gray-200">
-                        <th class="py-4 px-6 font-semibold">Container</th>
-                        <th class="py-4 px-6 font-semibold">Image</th>
-                        <th class="py-4 px-6 font-semibold">Status</th>
-                        <th class="py-4 px-6 font-semibold text-center">Auto-Update</th>
-                        <th class="py-4 px-6 font-semibold">Quarantine Status</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 text-sm">
-                    {% for c in containers %}
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="py-4 px-6 font-medium text-gray-900 flex items-center">
-                            <svg class="w-5 h-5 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                            {{ c.name }}
-                        </td>
-                        <td class="py-4 px-6 text-gray-600 truncate max-w-xs" title="{{ c.image }}">
-                            {{ c.image }}
-                        </td>
-                        <td class="py-4 px-6">
-                            {% if c.status == 'running' %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                    Running
-                                </span>
-                            {% elif c.status == 'exited' %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                    Exited
-                                </span>
-                            {% else %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                                    {{ c.status }}
-                                </span>
-                            {% endif %}
-                        </td>
-                        <td class="py-4 px-6 text-center">
-                            {% if c.auto_update %}
-                                <span class="text-green-500 text-lg" title="Auto-Update Enabled">🔄</span>
-                            {% else %}
-                                <span class="text-gray-300 text-lg" title="Auto-Update Disabled">-</span>
-                            {% endif %}
-                        </td>
-                        <td class="py-4 px-6">
-                            {% if c.quarantine %}
-                                <div class="flex items-center space-x-2">
-                                    <span class="bg-yellow-100 text-yellow-800 py-1 px-2 rounded text-xs font-medium border border-yellow-200">
-                                        {{ c.quarantine.remaining }} days left
-                                    </span>
-                                    {% if c.quarantine.has_warning %}
-                                    <span class="text-red-500 text-lg" title="Fast update detected during quarantine!">⚠️</span>
-                                    {% endif %}
+        <!-- Table Card -->
+        <div class="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-zinc-50/80 border-b border-zinc-200 text-zinc-500">
+                        <tr>
+                            <th class="h-11 px-6 align-middle font-medium">Container</th>
+                            <th class="h-11 px-6 align-middle font-medium">Image</th>
+                            <th class="h-11 px-6 align-middle font-medium">Status</th>
+                            <th class="h-11 px-6 align-middle font-medium text-center">Auto-Update</th>
+                            <th class="h-11 px-6 align-middle font-medium">Quarantine Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-200 text-zinc-700">
+                        {% for c in containers %}
+                        <tr class="transition-colors hover:bg-zinc-50/50">
+                            <td class="px-6 py-4 align-middle font-medium text-zinc-900 flex items-center gap-2.5">
+                                <div class="bg-zinc-100 p-1.5 rounded-md border border-zinc-200 shadow-sm">
+                                    <svg class="w-4 h-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
                                 </div>
-                            {% else %}
-                                <span class="text-gray-400 italic text-xs">Not in quarantine</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                                {{ c.name }}
+                            </td>
+                            <td class="px-6 py-4 align-middle text-zinc-500 max-w-[200px] truncate" title="{{ c.image }}">
+                                {{ c.image }}
+                            </td>
+                            <td class="px-6 py-4 align-middle">
+                                {% if c.status == 'running' %}
+                                    <div class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 shadow-sm">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
+                                        Running
+                                    </div>
+                                {% elif c.status == 'exited' %}
+                                    <div class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 shadow-sm">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5"></span>
+                                        Exited
+                                    </div>
+                                {% else %}
+                                    <div class="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-xs font-semibold text-zinc-700 shadow-sm">
+                                        {{ c.status }}
+                                    </div>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 align-middle text-center">
+                                {% if c.auto_update %}
+                                    <span class="inline-flex items-center justify-center bg-zinc-100 border border-zinc-200 rounded-md w-7 h-7 text-zinc-700 shadow-sm" title="Auto-Update Enabled">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                    </span>
+                                {% else %}
+                                    <span class="text-zinc-300" title="Auto-Update Disabled">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 align-middle">
+                                {% if c.quarantine %}
+                                    <div class="flex items-center gap-2">
+                                        <div class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 shadow-sm">
+                                            {{ c.quarantine.remaining }} days left
+                                        </div>
+                                        {% if c.quarantine.has_warning %}
+                                        <div class="group relative cursor-help inline-flex items-center justify-center">
+                                            <span class="text-rose-500 text-lg drop-shadow-sm">⚠️</span>
+                                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden w-48 rounded-md border border-zinc-200 bg-white p-2 text-xs text-zinc-700 shadow-lg group-hover:block transition-all z-10 text-center">
+                                                Fast update detected during quarantine!
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-zinc-400 text-sm">Not in quarantine</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
-        <footer class="mt-8 text-center text-gray-500 text-sm">
-            Powered by TelegramTower
+        
+        <footer class="mt-8 text-center text-zinc-400 text-sm pb-8">
+            <p>Powered by <span class="font-medium text-zinc-500">TelegramTower</span></p>
         </footer>
     </div>
 </body>
