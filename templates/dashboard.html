@@ -35,33 +35,94 @@
         </header>
 
         <!-- Configuration Section -->
-        <div class="rounded-xl border border-zinc-200 bg-white shadow-sm text-zinc-950">
-            <div class="flex flex-col space-y-1.5 p-6 pb-4">
-                <h3 class="font-semibold leading-none tracking-tight text-lg">Bot Configuration</h3>
-                <p class="text-sm text-zinc-500">Update your Telegram Bot Token. Settings saved here override environment variables.</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="rounded-xl border border-zinc-200 bg-white shadow-sm text-zinc-950 flex flex-col">
+                <div class="flex flex-col space-y-1.5 p-6 pb-4">
+                    <h3 class="font-semibold leading-none tracking-tight text-lg">Bot Configuration</h3>
+                    <p class="text-sm text-zinc-500">Update your Telegram Bot Token. Settings saved here override environment variables.</p>
+                </div>
+                <div class="p-6 pt-0 flex-1 flex flex-col justify-between">
+                    <form method="POST" action="/" class="flex flex-col space-y-3">
+                        <input type="hidden" name="action" value="save_bot_token">
+                        <div class="relative w-full">
+                            {% if env_token and db_token and env_token != db_token %}
+                            <div class="absolute right-3 top-1/2 -translate-y-1/2 group cursor-help z-10 flex items-center">
+                                <span class="text-amber-500 text-sm drop-shadow-sm">⚠️</span>
+                                <div class="absolute bottom-full right-0 mb-2 hidden w-64 rounded-md border border-zinc-200 bg-white p-3 text-xs text-zinc-700 shadow-lg group-hover:block transition-all">
+                                    <strong>Conflict Detected:</strong> El token usado es el de la web. Se recomienda usar solo uno (web o variable de entorno) para evitar conflictos.
+                                </div>
+                            </div>
+                            {% endif %}
+                            <input type="text" name="bot_token" id="bot_token" value="{{ db_token or env_token }}" placeholder="Enter Telegram Bot Token..." 
+                                   class="flex h-10 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+                        </div>
+                        <button type="submit" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 h-10 px-6 py-2 shadow-sm w-full">
+                            Save Token
+                        </button>
+                    </form>
+                    <p class="text-[13px] text-zinc-500 mt-4 flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Restart container to apply changes.
+                    </p>
+                </div>
             </div>
-            <div class="p-6 pt-0">
-                <form method="POST" action="/" class="flex flex-col sm:flex-row max-w-2xl items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-3">
-                    <div class="relative flex-grow w-full">
-                        {% if env_token and db_token and env_token != db_token %}
-                        <div class="absolute right-3 top-1/2 -translate-y-1/2 group cursor-help z-10 flex items-center">
-                            <span class="text-amber-500 text-sm drop-shadow-sm">⚠️</span>
-                            <div class="absolute bottom-full right-0 mb-2 hidden w-64 rounded-md border border-zinc-200 bg-white p-3 text-xs text-zinc-700 shadow-lg group-hover:block transition-all">
-                                <strong>Conflict Detected:</strong> El token usado es el de la web. Se recomienda usar solo uno (web o variable de entorno) para evitar conflictos.
+
+            <div class="rounded-xl border border-zinc-200 bg-white shadow-sm text-zinc-950 flex flex-col">
+                <div class="flex flex-col space-y-1.5 p-6 pb-4">
+                    <h3 class="font-semibold leading-none tracking-tight text-lg">Global Settings</h3>
+                    <p class="text-sm text-zinc-500">Configure global update checking and cleanup preferences.</p>
+                </div>
+                <div class="p-6 pt-0">
+                    <form method="POST" action="/" class="space-y-4">
+                        <input type="hidden" name="action" value="save_global_settings">
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="space-y-1">
+                                <label class="text-xs font-medium text-zinc-700">Check Interval (Days)</label>
+                                <select name="poll_interval_days" class="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+                                    <option value="1" {% if settings.poll_interval_days == 1 %}selected{% endif %}>1 Day</option>
+                                    <option value="7" {% if settings.poll_interval_days == 7 %}selected{% endif %}>7 Days</option>
+                                    <option value="30" {% if settings.poll_interval_days == 30 %}selected{% endif %}>30 Days</option>
+                                </select>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-medium text-zinc-700">Request Delay (Secs)</label>
+                                <select name="request_delay_seconds" class="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+                                    <option value="0" {% if settings.request_delay_seconds == 0 %}selected{% endif %}>0s</option>
+                                    <option value="2" {% if settings.request_delay_seconds == 2 %}selected{% endif %}>2s</option>
+                                    <option value="5" {% if settings.request_delay_seconds == 5 %}selected{% endif %}>5s</option>
+                                </select>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-medium text-zinc-700">Quarantine Delay (Days)</label>
+                                <select name="quarantine_days" class="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+                                    <option value="0" {% if settings.quarantine_days == 0 %}selected{% endif %}>None (0)</option>
+                                    <option value="1" {% if settings.quarantine_days == 1 %}selected{% endif %}>1 Day</option>
+                                    <option value="3" {% if settings.quarantine_days == 3 %}selected{% endif %}>3 Days</option>
+                                    <option value="5" {% if settings.quarantine_days == 5 %}selected{% endif %}>5 Days</option>
+                                    <option value="7" {% if settings.quarantine_days == 7 %}selected{% endif %}>7 Days</option>
+                                </select>
                             </div>
                         </div>
-                        {% endif %}
-                        <input type="text" name="bot_token" id="bot_token" value="{{ db_token or env_token }}" placeholder="Enter Telegram Bot Token..." 
-                               class="flex h-10 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
-                    </div>
-                    <button type="submit" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 h-10 px-6 py-2 shadow-sm w-full sm:w-auto">
-                        Save Token
-                    </button>
-                </form>
-                <p class="text-[13px] text-zinc-500 mt-3 flex items-center gap-1.5">
-                    <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Remember to restart the container for token changes to take effect.
-                </p>
+
+                        <div class="flex items-center space-x-6 pt-2">
+                            <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
+                                <input type="checkbox" name="cleanup_old_image" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.cleanup_old_image %}checked{% endif %}>
+                                <span>Cleanup Old Images</span>
+                            </label>
+                            <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
+                                <input type="checkbox" name="include_stopped" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.include_stopped %}checked{% endif %}>
+                                <span>Check Stopped</span>
+                            </label>
+                        </div>
+                        
+                        <div class="pt-2">
+                            <button type="submit" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 h-9 px-4 py-2 shadow-sm w-full">
+                                Save Global Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
@@ -108,13 +169,21 @@
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4 align-middle text-center">
-                                {% if c.auto_update %}
-                                    <span class="inline-flex items-center justify-center bg-zinc-100 border border-zinc-200 rounded-md w-7 h-7 text-zinc-700 shadow-sm" title="Auto-Update Enabled">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                                    </span>
-                                {% else %}
-                                    <span class="text-zinc-300" title="Auto-Update Disabled">-</span>
-                                {% endif %}
+                                <form method="POST" action="/">
+                                    <input type="hidden" name="action" value="toggle_auto_update">
+                                    <input type="hidden" name="container_name" value="{{ c.name }}">
+                                    <button type="submit" class="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 rounded-md transition-transform active:scale-95">
+                                        {% if c.auto_update %}
+                                            <span class="inline-flex items-center justify-center bg-zinc-100 border border-zinc-200 rounded-md w-7 h-7 text-zinc-900 shadow-sm hover:bg-zinc-200 transition-colors" title="Auto-Update Enabled (Click to Disable)">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                            </span>
+                                        {% else %}
+                                            <span class="inline-flex items-center justify-center bg-white border border-dashed border-zinc-300 rounded-md w-7 h-7 text-zinc-300 hover:text-zinc-500 hover:border-zinc-400 hover:bg-zinc-50 transition-colors" title="Auto-Update Disabled (Click to Enable)">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                            </span>
+                                        {% endif %}
+                                    </button>
+                                </form>
                             </td>
                             <td class="px-6 py-4 align-middle">
                                 {% if c.quarantine %}

@@ -49,11 +49,24 @@ def dashboard() -> Any:
         config_db = app.config["CONFIG_DB"]
 
         if request.method == "POST":
-            new_token = request.form.get("bot_token", "").strip()
-            if new_token:
-                config_db.set_bot_token(new_token)
-            else:
-                config_db.set_bot_token("") # Allow clearing it
+            action = request.form.get("action")
+            if action == "save_bot_token":
+                new_token = request.form.get("bot_token", "").strip()
+                if new_token:
+                    config_db.set_bot_token(new_token)
+                else:
+                    config_db.set_bot_token("")
+            elif action == "save_global_settings":
+                config_db.set_poll_interval_days(int(request.form.get("poll_interval_days", 1)))
+                config_db.set_request_delay_seconds(int(request.form.get("request_delay_seconds", 0)))
+                config_db.set_cleanup_old_image(request.form.get("cleanup_old_image") == "on")
+                config_db.set_include_stopped(request.form.get("include_stopped") == "on")
+                config_db.set_quarantine_days(int(request.form.get("quarantine_days", 0)))
+            elif action == "toggle_auto_update":
+                container_name = request.form.get("container_name")
+                if container_name:
+                    current_val = config_db.get_auto_update(container_name)
+                    config_db.set_auto_update(container_name, not current_val)
 
         include_stopped = config_db.get_include_stopped()
         containers = docker_manager.get_containers(include_stopped=include_stopped)
@@ -66,6 +79,14 @@ def dashboard() -> Any:
         
         env_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
         db_token = config_db.get_bot_token() or ""
+
+        settings = {
+            "poll_interval_days": config_db.get_poll_interval_days(),
+            "request_delay_seconds": config_db.get_request_delay_seconds(),
+            "cleanup_old_image": config_db.get_cleanup_old_image(),
+            "include_stopped": config_db.get_include_stopped(),
+            "quarantine_days": q_days_global,
+        }
 
         data = []
         for c in containers:
@@ -106,7 +127,8 @@ def dashboard() -> Any:
             containers=data, 
             q_days_global=q_days_global,
             env_token=env_token,
-            db_token=db_token
+            db_token=db_token,
+            settings=settings
         )
     except Exception as e:
         logger.error(f"Error serving dashboard: {e}")
