@@ -41,12 +41,19 @@ def requires_auth(f: Callable) -> Callable:
     return decorated
 
 
-@app.route("/")
+@app.route("/", methods=["GET", "POST"])
 @requires_auth
 def dashboard() -> Any:
     try:
         docker_manager = app.config["DOCKER_MANAGER"]
         config_db = app.config["CONFIG_DB"]
+
+        if request.method == "POST":
+            new_token = request.form.get("bot_token", "").strip()
+            if new_token:
+                config_db.set_bot_token(new_token)
+            else:
+                config_db.set_bot_token("") # Allow clearing it
 
         include_stopped = config_db.get_include_stopped()
         containers = docker_manager.get_containers(include_stopped=include_stopped)
@@ -56,6 +63,9 @@ def dashboard() -> Any:
 
         q_days_global = config_db.get_quarantine_days()
         now = datetime.datetime.now(datetime.timezone.utc)
+        
+        env_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+        db_token = config_db.get_bot_token() or ""
 
         data = []
         for c in containers:
@@ -92,7 +102,11 @@ def dashboard() -> Any:
         data.sort(key=lambda x: x["name"])
 
         return render_template(
-            "dashboard.html", containers=data, q_days_global=q_days_global
+            "dashboard.html", 
+            containers=data, 
+            q_days_global=q_days_global,
+            env_token=env_token,
+            db_token=db_token
         )
     except Exception as e:
         logger.error(f"Error serving dashboard: {e}")

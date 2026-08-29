@@ -8,6 +8,32 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 280px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 10px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -140px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.75rem;
+            font-weight: normal;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen text-gray-800 p-6">
@@ -22,6 +48,28 @@
                 {{ containers|length }} Containers
             </div>
         </header>
+
+        <!-- Configuration Section -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden mb-8 p-6">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">Bot Configuration</h2>
+            <form method="POST" action="/" class="flex items-end space-x-4">
+                <div class="flex-grow">
+                    <label for="bot_token" class="block text-sm font-medium text-gray-700 mb-1">
+                        Telegram Bot Token
+                        {% if env_token and db_token and env_token != db_token %}
+                            <span class="tooltip text-amber-500 text-lg cursor-help ml-2">⚠️
+                                <span class="tooltiptext">El token usado es el de la web. Se recomienda usar solo uno (web o variable de entorno) para evitar conflictos.</span>
+                            </span>
+                        {% endif %}
+                    </label>
+                    <input type="text" name="bot_token" id="bot_token" value="{{ db_token or env_token }}" placeholder="Enter bot token..." class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-3 py-2 border">
+                </div>
+                <div>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md shadow-sm transition-colors text-sm">Save Token</button>
+                </div>
+            </form>
+            <p class="text-xs text-gray-500 mt-2">Note: Saving a new token here will override the TELEGRAM_BOT_TOKEN environment variable. You must restart the container for token changes to take effect.</p>
+        </div>
 
         <div class="bg-white rounded-lg shadow-md overflow-hidden">
             <table class="min-w-full text-left border-collapse">

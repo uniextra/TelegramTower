@@ -101,6 +101,12 @@ class ConfigDB:
     def set_auto_update(self, container_name: str, enabled: bool) -> None:
         self.set_config(f"auto_{container_name}", "1" if enabled else "0")
 
+    def get_bot_token(self) -> Optional[str]:
+        return self.get_config("bot_token")
+
+    def set_bot_token(self, token: str) -> None:
+        self.set_config("bot_token", token)
+
     # Quarantine methods
     def get_quarantine_days(self) -> int:
         return int(self.get_config("quarantine_days", 0))

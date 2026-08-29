@@ -17,15 +17,18 @@ from web_server import start_web_server
 
 
 def main():
-    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    logger.info("Initializing Database...")
+    config_db = ConfigDB()
+
+    env_bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    db_bot_token = config_db.get_bot_token()
+    
+    bot_token = db_bot_token or env_bot_token
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
 
     if not bot_token or not chat_id:
         logger.error("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set.")
         return
-
-    logger.info("Initializing Database...")
-    config_db = ConfigDB()
 
     logger.info("Initializing Docker Manager...")
     docker_manager = DockerManager()
