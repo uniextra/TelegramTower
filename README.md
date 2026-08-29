@@ -10,6 +10,13 @@ TelegramTower is a lightweight, Watchtower-inspired Docker container update mana
 * **GHCR Support:** Seamlessly works with GitHub Container Registry, Docker Hub, and private registries.
 * **Exclude Containers:** Easily exclude specific containers from updates using standard labels.
 
+## Web Dashboard
+
+TelegramTower includes a built-in Web Dashboard available at port `8080`.
+* **Global Overview:** View all your containers, their current status, auto-update settings, and quarantine time left at a glance.
+* **Token Management:** Configure your `TELEGRAM_BOT_TOKEN` directly from the web interface (any conflicts with environment variables will be highlighted).
+* **Security:** Protect the dashboard with Basic Auth by setting `WEB_USER` and `WEB_PASSWORD` environment variables.
+
 ## Previews
 
 | Startup & Main Menu | Settings Details | Check Interval Selection |
@@ -32,12 +39,17 @@ services:
     image: uniextra/telegramtower:latest
     container_name: telegramtower
     restart: unless-stopped
+    ports:
+      - "8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./telegramtower_data:/app/data
     environment:
       - TELEGRAM_BOT_TOKEN=your_bot_token_here
       - TELEGRAM_CHAT_ID=your_chat_id_here
+      # Optional: Secure the web dashboard
+      - WEB_USER=admin
+      - WEB_PASSWORD=secret_password
 ```
 
 Then run:
