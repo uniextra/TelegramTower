@@ -67,6 +67,10 @@ def dashboard() -> Any:
                 if container_name:
                     current_val = config_db.get_auto_update(container_name)
                     config_db.set_auto_update(container_name, not current_val)
+            elif action == "clear_snooze":
+                container_name = request.form.get("container_name")
+                if container_name:
+                    config_db.clear_snooze(container_name)
 
         include_stopped = config_db.get_include_stopped()
         containers = docker_manager.get_containers(include_stopped=include_stopped)
@@ -92,6 +96,7 @@ def dashboard() -> Any:
         for c in containers:
             c_name = c.name
             auto_update = config_db.get_auto_update(c_name)
+            snoozed = config_db.is_snoozed(c_name)
 
             q_info = None
             if c_name in q_dict:
@@ -117,6 +122,7 @@ def dashboard() -> Any:
                     "image": c.attrs.get("Config", {}).get("Image", "Unknown"),
                     "auto_update": auto_update,
                     "quarantine": q_info,
+                    "snoozed": snoozed,
                 }
             )
 

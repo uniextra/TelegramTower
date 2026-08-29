@@ -186,7 +186,20 @@
                                 </form>
                             </td>
                             <td class="px-6 py-4 align-middle">
-                                {% if c.quarantine %}
+                                {% if c.snoozed %}
+                                    <div class="flex items-center gap-2">
+                                        <div class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 shadow-sm" title="Muted for 30 days">
+                                            🔕 Snoozed
+                                        </div>
+                                        <form method="POST" action="/" class="inline-block m-0 p-0">
+                                            <input type="hidden" name="action" value="clear_snooze">
+                                            <input type="hidden" name="container_name" value="{{ c.name }}">
+                                            <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-800 underline decoration-indigo-300 hover:decoration-indigo-800 transition-colors">
+                                                Un-snooze
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% elif c.quarantine %}
                                     <div class="flex items-center gap-2">
                                         <div class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 shadow-sm">
                                             {{ c.quarantine.remaining }} days left
