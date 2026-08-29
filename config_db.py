@@ -101,6 +101,32 @@ class ConfigDB:
     def set_auto_update(self, container_name: str, enabled: bool) -> None:
         self.set_config(f"auto_{container_name}", "1" if enabled else "0")
 
+    def set_snooze(self, container_name: str, days: int) -> None:
+        import datetime
+        now = datetime.datetime.now(datetime.timezone.utc)
+        snoozed_until = (now + datetime.timedelta(days=days)).isoformat()
+        self.set_config(f"snooze_{container_name}", snoozed_until)
+
+    def get_snoozed_until(self, container_name: str) -> Optional[str]:
+        return self.get_config(f"snooze_{container_name}")
+
+    def is_snoozed(self, container_name: str) -> bool:
+        snoozed_until_iso = self.get_snoozed_until(container_name)
+        if not snoozed_until_iso:
+            return False
+        import datetime
+        try:
+            snoozed_until = datetime.datetime.fromisoformat(snoozed_until_iso)
+            now = datetime.datetime.now(datetime.timezone.utc)
+            return now < snoozed_until
+        except ValueError:
+            return False
+
+    def clear_snooze(self, container_name: str) -> None:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DELETE FROM config WHERE key = ?", (f"snooze_{container_name}",))
+            conn.commit()
+
     def get_bot_token(self) -> Optional[str]:
         return self.get_config("bot_token")
 

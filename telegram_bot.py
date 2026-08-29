@@ -404,30 +404,39 @@ class TelegramBot:
         )
 
     async def send_update_notification(
-        self, container_name, new_image, is_stopped=False, remote_info=None
+        self, container_name, new_image, is_stopped=False, remote_info=None, is_same_version=False, reset_count=0
     ):
         """Sends a notification with Inline Keyboard to update or ignore."""
         state_str = self.t("state_stopped") if is_stopped else ""
-        msg = self.t(
-            "update_msg", container=container_name, state=state_str, image=new_image
-        )
+        lang = self.config_db.get_language()
+        
+        if is_same_version or reset_count >= 2:
+            # Spammy update detected
+            msg = (f"⚠️ *¡CUIDADO!* Actualizaciones repetitivas detectadas para *{container_name}*.\n"
+                   f"Los metadatos indican que es la misma versión o son compilaciones nocturnas automáticas.\n\n"
+                   f"¿Deseas silenciar este contenedor por 30 días para evitar avisos innecesarios?") if lang == "es" else \
+                  (f"⚠️ *WARNING!* Repetitive updates detected for *{container_name}*.\n"
+                   f"Metadata indicates this is the same version or automated nightly builds.\n\n"
+                   f"Would you like to mute this container for 30 days?")
+        else:
+            msg = self.t(
+                "update_msg", container=container_name, state=state_str, image=new_image
+            )
+            if remote_info:
+                version = remote_info.get("version")
+                source = remote_info.get("source")
 
-        if remote_info:
-            version = remote_info.get("version")
-            source = remote_info.get("source")
-            lang = self.config_db.get_language()
-
-            if version:
-                msg += (
-                    f"\n📦 Version: `{version}`"
-                    if lang == "en"
-                    else f"\n📦 Versión: `{version}`"
-                )
-            if source:
-                link_text = (
-                    "Changelog / Source" if lang == "en" else "Ver código/changelog"
-                )
-                msg += f"\n🔗 [{link_text}]({source})"
+                if version:
+                    msg += (
+                        f"\n📦 Version: `{version}`"
+                        if lang == "en"
+                        else f"\n📦 Versión: `{version}`"
+                    )
+                if source:
+                    link_text = (
+                        "Changelog / Source" if lang == "en" else "Ver código/changelog"
+                    )
+                    msg += f"\n🔗 [{link_text}]({source})"
 
         keyboard = [
             [
@@ -444,6 +453,12 @@ class TelegramBot:
                 )
             ],
         ]
+        
+        if is_same_version or reset_count >= 2:
+            snooze_text = "🔕 Silenciar 30d" if lang == "es" else "🔕 Snooze 30d"
+            # prepend snooze button
+            keyboard.insert(0, [InlineKeyboardButton(snooze_text, callback_data=f"snooze_{container_name}")])
+            
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         try:
@@ -575,7 +590,7 @@ class TelegramBot:
                 )
                 target = next((c for c in containers if c.name == container_name), None)
                 if target:
-                    _, remote_digest = await asyncio.to_thread(
+                    _, remote_digest, _, _ = await asyncio.to_thread(
                         self.docker_manager.check_for_updates, target
                     )
 
@@ -585,6 +600,13 @@ class TelegramBot:
             await query.edit_message_text(
                 text=self.t("ignored_msg", container=container_name)
             )
+            return
+            
+        if action == "snooze":
+            self.config_db.set_snooze(container_name, 30)
+            self.config_db.delete_quarantine_record(container_name)
+            msg = f"🔕 Contenedor *{container_name}* silenciado por 30 días." if self.config_db.get_language() == "es" else f"🔕 Container *{container_name}* snoozed for 30 days."
+            await query.edit_message_text(text=msg, parse_mode="Markdown")
             return
 
         if action in ["update", "auto"]:
@@ -652,11 +674,15 @@ class TelegramBot:
         for i, container in enumerate(containers):
             if i > 0 and delay > 0:
                 await asyncio.sleep(delay)
+                
+            if self.config_db.is_snoozed(container.name):
+                logger.info(f"Skipping {container.name} because it is snoozed.")
+                continue
 
             logger.info(
                 f"Inspecting container {container.name} (status: {container.status})"
             )
-            new_image, remote_digest, remote_info = await asyncio.to_thread(
+            new_image, remote_digest, remote_info, is_same_version = await asyncio.to_thread(
                 self.docker_manager.check_for_updates, container
             )
 
@@ -746,13 +772,8 @@ class TelegramBot:
                                     f"Container {container.name} skipped quarantine 3 times!"
                                 )
                                 try:
-                                    await self.application.bot.send_message(
-                                        chat_id=self.chat_id,
-                                        text=self.t(
-                                            "quarantine_warning",
-                                            container=container.name,
-                                        ),
-                                        parse_mode="Markdown",
+                                    await self.send_update_notification(
+                                        container.name, new_image, container.status != "running", remote_info, is_same_version=is_same_version, reset_count=new_count
                                     )
                                 except Exception as e:
                                     logger.error(
@@ -787,35 +808,40 @@ class TelegramBot:
                     )
                     success = result[0]
                     msg_str = self.format_update_result(result)
-                    status = self.t("success") if success else self.t("failed")
-
+                    
                     if success:
                         msg = self.t(
                             "auto_updated_notification",
                             container=container.name,
                             image=new_image,
                         )
+                        self.config_db.clear_snooze(container.name)
                     else:
                         msg = self.t(
                             "auto_updating_msg", container=container.name
-                        )  # fallback
+                        ) + f"\n\nError: {msg_str}"
 
-                    await self.application.bot.send_message(
-                        chat_id=self.chat_id,
-                        text=f"{msg}\n{status}: {msg_str}",
-                        parse_mode="Markdown",
+                    try:
+                        await self.application.bot.send_message(
+                            chat_id=self.chat_id, text=msg, parse_mode="Markdown"
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to send auto-update msg: {e}")
+                else:
+                    # Store pending update and notify user manually
+                    self.pending_updates[container.name] = remote_digest
+                    logger.info(
+                        f"Update found for {container.name}: {new_image}. Sending notification..."
                     )
-                    continue
-
-                # Store pending update and notify user manually
-                self.pending_updates[container.name] = remote_digest
-                logger.info(
-                    f"Update found for {container.name}: {new_image}. Sending notification..."
-                )
-                is_stopped = container.status != "running"
-                await self.send_update_notification(
-                    container.name, new_image, is_stopped, remote_info
-                )
+                    is_stopped = container.status != "running"
+                    await self.send_update_notification(
+                        container.name, 
+                        new_image, 
+                        is_stopped, 
+                        remote_info,
+                        is_same_version=is_same_version,
+                        reset_count=q_record.get("reset_count", 0) if (q_days > 0 and q_record) else 0
+                    )
             else:
                 logger.info(f"No update for {container.name}")
                 self.config_db.delete_quarantine_record(container.name)

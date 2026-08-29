@@ -28,7 +28,7 @@ def test_check_for_updates_no_tags(mock_docker_client):
     mock_container.image.tags = []
     mock_container.image.attrs = {}
 
-    assert manager.check_for_updates(mock_container) == (None, None, None)
+    assert manager.check_for_updates(mock_container) == (None, None, None, False)
 
 
 def test_check_for_updates_update_available(mock_docker_client, mocker):
@@ -62,6 +62,7 @@ def test_check_for_updates_update_available(mock_docker_client, mocker):
             "version": "1.4",
             "source": "https://github.com/a",
         },
+        False,
     )
 
 
@@ -78,4 +79,4 @@ def test_check_for_updates_no_update(mock_docker_client):
     manager.client.images.get_registry_data.return_value = mock_registry_data
 
     result = manager.check_for_updates(mock_container)
-    assert result == (None, None, None)
+    assert result == (None, None, None, False)

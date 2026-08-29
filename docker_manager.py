@@ -18,10 +18,11 @@ class DockerManager:
 
     def check_for_updates(
         self, container: Container
-    ) -> Tuple[Optional[str], Optional[str], Optional[Dict[str, Any]]]:
+    ) -> Tuple[Optional[str], Optional[str], Optional[Dict[str, Any]], bool]:
         """
         Checks if a newer image exists for the given container on the registry.
         Returns the new image tag/digest if an update is available, else None.
+        Also returns whether the OCI version/revision labels are unchanged (rebuild).
         """
         labels = container.attrs.get("Config", {}).get("Labels", {}) or {}
         if (
@@ -30,7 +31,7 @@ class DockerManager:
             == "false"
         ):
             logger.info(f"Skipping container {container.name} due to disable label.")
-            return None, None, None
+            return None, None, None, False
 
         image = container.image
         # Get the actual image name used to start the container
@@ -58,8 +59,27 @@ class DockerManager:
                     from registry_api import RegistryFetcher
 
                     remote_info = RegistryFetcher.get_remote_image_info(image_name)
-                    return image_name, remote_digest, remote_info
-            return None, None, None
+                    
+                    is_same_version = False
+                    if remote_info and "config" in remote_info:
+                        remote_labels = remote_info["config"].get("Labels", {}) or {}
+                        local_labels = image.attrs.get("Config", {}).get("Labels", {}) or {}
+                        
+                        # 1. Check opencontainers version label
+                        if "org.opencontainers.image.version" in local_labels and "org.opencontainers.image.version" in remote_labels:
+                            if local_labels["org.opencontainers.image.version"] == remote_labels["org.opencontainers.image.version"]:
+                                is_same_version = True
+                        # 2. Check opencontainers revision (git commit hash)
+                        elif "org.opencontainers.image.revision" in local_labels and "org.opencontainers.image.revision" in remote_labels:
+                            if local_labels["org.opencontainers.image.revision"] == remote_labels["org.opencontainers.image.revision"]:
+                                is_same_version = True
+                        # 3. Check linuxserver specific build version
+                        elif "build_version" in local_labels and "build_version" in remote_labels:
+                            if local_labels["build_version"] == remote_labels["build_version"]:
+                                is_same_version = True
+                                
+                    return image_name, remote_digest, remote_info, is_same_version
+            return None, None, None, False
         except APIError as e:
             if e.response is not None and e.response.status_code == 403:
                 # Likely a local image or private registry without auth
@@ -68,10 +88,13 @@ class DockerManager:
                 )
             else:
                 logger.error(f"API Error checking updates for {container.name}: {e}")
-            return None, None, None
+            return None, None, None, False
         except DockerException as e:
             logger.error(f"Docker Exception checking updates for {container.name}: {e}")
-            return None, None, None
+            return None, None, None, False
+        except Exception as e:
+            logger.error(f"Unexpected error checking updates for {container.name}: {e}")
+            return None, None, None, False
 
     def update_container(
         self, container_id: str, cleanup_old_image: bool = False
