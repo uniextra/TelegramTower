@@ -22,12 +22,14 @@ def main():
 
     env_bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     db_bot_token = config_db.get_bot_token()
-    
     bot_token = db_bot_token or env_bot_token
-    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    
+    env_chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    db_chat_id = config_db.get_chat_id()
+    chat_id = db_chat_id or env_chat_id
 
     if not bot_token or not chat_id:
-        logger.error("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set.")
+        logger.error("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set (via ENV or Web UI).")
         return
 
     logger.info("Initializing Docker Manager...")

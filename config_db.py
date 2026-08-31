@@ -148,6 +148,13 @@ class ConfigDB:
     def set_bot_token(self, token: str) -> None:
         self.set_config("bot_token", token)
 
+    def get_chat_id(self) -> Optional[str]:
+        return self.get_config("chat_id")
+
+    def set_chat_id(self, chat_id: str) -> None:
+        self.set_config("chat_id", chat_id)
+
+    # --- Container Settings ---
     # Quarantine methods
     def get_quarantine_days(self) -> int:
         return int(self.get_config("quarantine_days", 0))

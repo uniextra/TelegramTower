@@ -50,12 +50,18 @@ def dashboard() -> Any:
 
         if request.method == "POST":
             action = request.form.get("action")
-            if action == "save_bot_token":
+            if action == "save_bot_credentials":
                 new_token = request.form.get("bot_token", "").strip()
                 if new_token:
                     config_db.set_bot_token(new_token)
                 else:
                     config_db.set_bot_token("")
+                
+                new_chat_id = request.form.get("chat_id", "").strip()
+                if new_chat_id:
+                    config_db.set_chat_id(new_chat_id)
+                else:
+                    config_db.set_chat_id("")
             elif action == "save_global_settings":
                 try:
                     config_db.set_poll_interval_days(int(request.form.get("poll_interval_days") or 1))
@@ -95,6 +101,9 @@ def dashboard() -> Any:
         
         env_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
         db_token = config_db.get_bot_token() or ""
+        env_chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+        db_chat_id = config_db.get_chat_id() or ""
+        
         env_only_whitelist = os.environ.get("ONLY_WHITELIST", "").lower() == "true"
 
         settings = {
@@ -153,6 +162,8 @@ def dashboard() -> Any:
             q_days_global=q_days_global,
             env_token=env_token,
             db_token=db_token,
+            env_chat_id=env_chat_id,
+            db_chat_id=db_chat_id,
             settings=settings
         )
     except Exception as e:
