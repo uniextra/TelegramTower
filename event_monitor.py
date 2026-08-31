@@ -65,8 +65,8 @@ class EventMonitor:
                     lang = self.config_db.get_language()
 
                     if action == "start" and self.config_db.get_events_notify_start():
-                        msg_es = f"▶️ Contenedor *{name}* ha iniciado."
-                        msg_en = f"▶️ Container *{name}* has started."
+                        msg_es = f"✅ Contenedor *{name}* ha iniciado."
+                        msg_en = f"✅ Container *{name}* has started."
                         self.telegram_callback(name, "start", msg_es if lang == "es" else msg_en)
                         
                     elif action == "die" and self.config_db.get_events_notify_stop():
@@ -81,8 +81,8 @@ class EventMonitor:
 
                     elif "health_status" in action and self.config_db.get_events_notify_health():
                         if "health_status: healthy" in action:
-                            msg_es = f"🩺 Contenedor *{name}* ahora está Healthy."
-                            msg_en = f"🩺 Container *{name}* is now Healthy."
+                            msg_es = f"❤️ Contenedor *{name}* ahora está Healthy."
+                            msg_en = f"❤️ Container *{name}* is now Healthy."
                             self.telegram_callback(name, "healthy", msg_es if lang == "es" else msg_en)
                         elif "health_status: unhealthy" in action:
                             msg_es = f"🤒 *¡ALERTA!* Contenedor *{name}* está Unhealthy."

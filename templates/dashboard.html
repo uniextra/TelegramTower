@@ -48,7 +48,7 @@
                         <div class="relative w-full">
                             {% if env_token and db_token and env_token != db_token %}
                             <div class="absolute right-3 top-1/2 -translate-y-1/2 group cursor-help z-10 flex items-center">
-                                <span class="text-amber-500 text-sm drop-shadow-sm">⚠️</span>
+                                <span class="text-amber-500 text-sm drop-shadow-sm" title="How often to check for image updates on Docker Hub.">⚠️</span>
                                 <div class="absolute bottom-full right-0 mb-2 hidden w-64 rounded-md border border-zinc-200 bg-white p-3 text-xs text-zinc-700 shadow-lg group-hover:block transition-all">
                                     <strong>Conflict Detected:</strong> El token usado es el de la web. Se recomienda usar solo uno (web o variable de entorno) para evitar conflictos.
                                 </div>
@@ -81,7 +81,7 @@
                             <div class="space-y-1">
                                 <label class="text-xs font-medium text-zinc-700 flex items-center">
                                     Check Interval (Days)
-                                    <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="How often to check for image updates on Docker Hub."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>How often to check for image updates on Docker Hub.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 </label>
                                 <select name="poll_interval_days" class="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
                                     <option value="1" {% if settings.poll_interval_days == 1 %}selected{% endif %}>1 Day</option>
@@ -90,9 +90,9 @@
                                 </select>
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-medium text-zinc-700 flex items-center">
+                                <label class="text-xs font-medium text-zinc-700 flex items-center" title="Delay between requests to Docker Hub to prevent rate limiting.">
                                     Request Delay (Secs)
-                                    <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Delay between requests to Docker Hub to prevent rate limiting."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Delay between requests to Docker Hub to prevent rate limiting.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 </label>
                                 <select name="request_delay_seconds" class="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
                                     <option value="0" {% if settings.request_delay_seconds == 0 %}selected{% endif %}>0s</option>
@@ -101,9 +101,9 @@
                                 </select>
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-medium text-zinc-700 flex items-center">
+                                <label class="text-xs font-medium text-zinc-700 flex items-center" title="Wait this many days before notifying about a new image update. Helps avoid unstable releases.">
                                     Quarantine Delay (Days)
-                                    <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Wait this many days before notifying about a new image update. Helps avoid unstable releases."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Wait this many days before notifying about a new image update. Helps avoid unstable releases.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 </label>
                                 <select name="quarantine_days" class="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
                                     <option value="0" {% if settings.quarantine_days == 0 %}selected{% endif %}>None (0)</option>
@@ -116,13 +116,13 @@
                         </div>
 
                         <div class="flex flex-wrap items-center gap-x-6 gap-y-3 pt-2">
-                            <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
+                            <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" title="Automatically remove the old Docker image after a container is successfully updated.">
                                 <input type="checkbox" name="cleanup_old_image" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.cleanup_old_image %}checked{% endif %}>
-                                <span class="flex items-center">Cleanup Old Images <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Automatically remove the old Docker image after a container is successfully updated."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
+                                <span class="flex items-center">Cleanup Old Images <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Automatically remove the old Docker image after a container is successfully updated.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
                             </label>
-                            <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
+                            <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" title="Also check for updates for containers that are currently stopped.">
                                 <input type="checkbox" name="include_stopped" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.include_stopped %}checked{% endif %}>
-                                <span class="flex items-center">Check Stopped <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Also check for updates for containers that are currently stopped."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
+                                <span class="flex items-center">Check Stopped <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Also check for updates for containers that are currently stopped.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
                             </label>
                         </div>
                         
@@ -130,10 +130,10 @@
                         <div class="mt-4 pt-4 border-t border-zinc-100">
                             <div class="flex items-center justify-between mb-3">
                                 <div>
-                                    <h4 class="text-sm font-medium text-zinc-900 flex items-center">Live Event Notifications <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Enable real-time Telegram notifications for container lifecycle events."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></h4>
+                                    <h4 class="text-sm font-medium text-zinc-900 flex items-center" title="Enable real-time Telegram notifications for container lifecycle events.">Live Event Notifications <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Enable real-time Telegram notifications for container lifecycle events.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></h4>
                                     <p class="text-xs text-zinc-500">Monitor real-time Docker events via Telegram</p>
                                 </div>
-                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" title="Send a message when a container starts.">
                                     <input type="checkbox" name="events_enabled" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_enabled %}checked{% endif %}>
                                     <span>Enable Events</span>
                                 </label>
@@ -142,19 +142,19 @@
                             <div class="grid grid-cols-2 gap-3 pl-2 opacity-90">
                                 <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
                                     <input type="checkbox" name="events_notify_start" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_notify_start %}checked{% endif %}>
-                                    <span class="flex items-center">Notify on Start <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Send a message when a container starts."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
+                                    <span class="flex items-center">Notify on Start <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Send a message when a container starts.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
                                 </label>
-                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" title="Send a message when a container stops or crashes.">
                                     <input type="checkbox" name="events_notify_stop" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_notify_stop %}checked{% endif %}>
-                                    <span class="flex items-center">Notify on Crash/Stop <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Send a message when a container stops or crashes."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
+                                    <span class="flex items-center">Notify on Crash/Stop <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Send a message when a container stops or crashes.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
                                 </label>
-                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" title="Send a message when a container healthcheck fails or recovers.">
                                     <input type="checkbox" name="events_notify_health" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_notify_health %}checked{% endif %}>
-                                    <span class="flex items-center">Notify Health Changes <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Send a message when a container healthcheck fails or recovers."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
+                                    <span class="flex items-center">Notify Health Changes <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Send a message when a container healthcheck fails or recovers.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
                                 </label>
-                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium {% if settings.env_only_whitelist %}text-zinc-400{% else %}text-indigo-700{% endif %}" title="Only monitor containers labeled with telegram-notifier.monitor=true">
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium {% if settings.env_only_whitelist %}text-zinc-400{% else %}text-indigo-700{% endif %}" title="Only monitor containers labeled with telegram-notifier.monitor=true" title="Only monitor events for containers with the telegram-notifier.monitor=true label.">
                                     <input type="checkbox" name="events_whitelist_only" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_whitelist_only %}checked{% endif %} {% if settings.env_only_whitelist %}disabled{% endif %}>
-                                    <span class="flex items-center">Whitelist Only <svg class="w-3.5 h-3.5 text-indigo-400 hover:text-indigo-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Only monitor events for containers with the telegram-notifier.monitor=true label."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
+                                    <span class="flex items-center">Whitelist Only <svg class="w-3.5 h-3.5 text-indigo-400 hover:text-indigo-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Only monitor events for containers with the telegram-notifier.monitor=true label.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
                                     {% if settings.env_only_whitelist %}
                                     <span class="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800" title="Forced by ONLY_WHITELIST environment variable">ENV OVERRIDE</span>
                                     <!-- Send hidden value so it doesn't get cleared by disabled state if the form saves -->
