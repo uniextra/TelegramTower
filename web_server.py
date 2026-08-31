@@ -4,7 +4,7 @@ import os
 from functools import wraps
 from typing import Any, Callable
 
-from flask import Flask, Response, render_template, request
+from flask import Flask, Response, redirect, render_template, request, url_for
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +81,8 @@ def dashboard() -> Any:
                 container_name = request.form.get("container_name")
                 if container_name:
                     config_db.clear_snooze(container_name)
+
+            return redirect(url_for("dashboard"))
 
         include_stopped = config_db.get_include_stopped()
         containers = docker_manager.get_containers(include_stopped=include_stopped)
