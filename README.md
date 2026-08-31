@@ -1,3 +1,7 @@
+<div align="center">
+<img src="static/logo.jpg" alt="TelegramTower Logo" width="150"/>
+</div>
+
 # TelegramTower 🗼
 
 TelegramTower is a lightweight, Watchtower-inspired Docker container update manager that puts you in control. Instead of updating containers automatically and silently in the background, TelegramTower notifies you via Telegram and lets you approve updates with a single tap.
