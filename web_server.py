@@ -120,11 +120,22 @@ def dashboard() -> Any:
             "env_only_whitelist": env_only_whitelist,
         }
 
+        last_updated_dict = config_db.get_all_last_updated()
+
         data = []
         for c in containers:
             c_name = c.name
             auto_update = config_db.get_auto_update(c_name)
             snoozed = config_db.is_snoozed(c_name)
+            
+            last_updated_str = "Never"
+            if c_name in last_updated_dict:
+                try:
+                    iso_str = last_updated_dict[c_name].replace("Z", "+00:00")
+                    dt = datetime.datetime.fromisoformat(iso_str)
+                    last_updated_str = dt.strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    last_updated_str = last_updated_dict[c_name]
 
             q_info = None
             if c_name in q_dict:
@@ -151,6 +162,7 @@ def dashboard() -> Any:
                     "auto_update": auto_update,
                     "quarantine": q_info,
                     "snoozed": snoozed,
+                    "last_updated": last_updated_str,
                 }
             )
 

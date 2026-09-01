@@ -101,6 +101,15 @@ class ConfigDB:
     def set_auto_update(self, container_name: str, enabled: bool) -> None:
         self.set_config(f"auto_{container_name}", "1" if enabled else "0")
 
+    def set_last_updated(self, container_name: str, timestamp: str) -> None:
+        self.set_config(f"last_updated_{container_name}", timestamp)
+        
+    def get_all_last_updated(self) -> dict:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("SELECT key, value FROM config WHERE key LIKE 'last_updated_%'")
+            rows = cursor.fetchall()
+            return {row[0].replace("last_updated_", ""): row[1] for row in rows}
+
     def set_snooze(self, container_name: str, days: int) -> None:
         import datetime
         now = datetime.datetime.now(datetime.timezone.utc)

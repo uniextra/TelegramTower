@@ -193,6 +193,7 @@
                             <th class="h-11 px-6 align-middle font-medium">Status</th>
                             <th class="h-11 px-6 align-middle font-medium text-center">Auto-Update</th>
                             <th class="h-11 px-6 align-middle font-medium">Quarantine Status</th>
+                            <th class="h-11 px-6 align-middle font-medium">Last Updated</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-200 text-zinc-700">
@@ -272,6 +273,9 @@
                                 {% else %}
                                     <span class="text-zinc-400 text-sm">Not in quarantine</span>
                                 {% endif %}
+                            </td>
+                            <td class="px-6 py-4 align-middle text-zinc-500 text-sm">
+                                {{ c.last_updated }}
                             </td>
                         </tr>
                         {% endfor %}

@@ -644,6 +644,8 @@ class TelegramBot:
             status = self.t("success") if success else self.t("failed")
 
             if success:
+                import datetime
+                self.config_db.set_last_updated(container_name, datetime.datetime.now(datetime.timezone.utc).isoformat())
                 self.pending_updates.pop(container_name, None)
 
             await query.edit_message_text(text=f"{status}: {msg_str}")
@@ -810,6 +812,8 @@ class TelegramBot:
                     msg_str = self.format_update_result(result)
                     
                     if success:
+                        import datetime
+                        self.config_db.set_last_updated(container.name, datetime.datetime.now(datetime.timezone.utc).isoformat())
                         msg = self.t(
                             "auto_updated_notification",
                             container=container.name,
