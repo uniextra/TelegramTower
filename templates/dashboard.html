@@ -185,30 +185,30 @@
         <!-- Table Card -->
         <div class="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left">
+                <table id="containers-table" class="w-full text-sm text-left">
                     <thead class="bg-zinc-50/80 border-b border-zinc-200 text-zinc-500">
                         <tr>
-                            <th class="h-11 px-6 align-middle font-medium">Container</th>
-                            <th class="h-11 px-6 align-middle font-medium">Image</th>
-                            <th class="h-11 px-6 align-middle font-medium">Status</th>
-                            <th class="h-11 px-6 align-middle font-medium text-center">Auto-Update</th>
-                            <th class="h-11 px-6 align-middle font-medium">Quarantine Status</th>
-                            <th class="h-11 px-6 align-middle font-medium">Last Updated</th>
+                            <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(0)">Container <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
+                            <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(1)">Image <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
+                            <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(2)">Status <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
+                            <th class="h-11 px-6 align-middle font-medium text-center cursor-pointer select-none group" onclick="sortTable(3)">Auto-Update <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
+                            <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(4)">Quarantine Status <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
+                            <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(5)">Last Updated <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-200 text-zinc-700">
                         {% for c in containers %}
                         <tr class="transition-colors hover:bg-zinc-50/50">
-                            <td class="px-6 py-4 align-middle font-medium text-zinc-900 flex items-center gap-2.5">
+                            <td class="px-6 py-4 align-middle font-medium text-zinc-900 flex items-center gap-2.5" data-sort="{{ c.name }}">
                                 <div class="bg-zinc-100 p-1.5 rounded-md border border-zinc-200 shadow-sm">
                                     <svg class="w-4 h-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
                                 </div>
                                 {{ c.name }}
                             </td>
-                            <td class="px-6 py-4 align-middle text-zinc-500 max-w-[200px] truncate" title="{{ c.image }}">
+                            <td class="px-6 py-4 align-middle text-zinc-500 max-w-[200px] truncate" title="{{ c.image }}" data-sort="{{ c.image }}">
                                 {{ c.image }}
                             </td>
-                            <td class="px-6 py-4 align-middle">
+                            <td class="px-6 py-4 align-middle" data-sort="{{ c.status }}">
                                 {% if c.status == 'running' %}
                                     <div class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 shadow-sm">
                                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
@@ -225,7 +225,7 @@
                                     </div>
                                 {% endif %}
                             </td>
-                            <td class="px-6 py-4 align-middle text-center">
+                            <td class="px-6 py-4 align-middle text-center" data-sort="{{ '1' if c.auto_update else '0' }}">
                                 <form method="POST" action="/">
                                     <input type="hidden" name="action" value="toggle_auto_update">
                                     <input type="hidden" name="container_name" value="{{ c.name }}">
@@ -242,7 +242,7 @@
                                     </button>
                                 </form>
                             </td>
-                            <td class="px-6 py-4 align-middle">
+                            <td class="px-6 py-4 align-middle" data-sort="{{ c.quarantine.remaining if c.quarantine else (-1 if c.snoozed else 0) }}">
                                 {% if c.snoozed %}
                                     <div class="flex items-center gap-2">
                                         <div class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 shadow-sm" title="Muted for 30 days">
@@ -274,7 +274,7 @@
                                     <span class="text-zinc-400 text-sm">Not in quarantine</span>
                                 {% endif %}
                             </td>
-                            <td class="px-6 py-4 align-middle text-zinc-500 text-sm">
+                            <td class="px-6 py-4 align-middle text-zinc-500 text-sm" data-sort="{{ c.last_updated }}">
                                 {{ c.last_updated }}
                             </td>
                         </tr>
@@ -288,5 +288,61 @@
             <p>Powered by <span class="font-medium text-zinc-500">TelegramTower</span></p>
         </footer>
     </div>
+
+    <script>
+        let currentSort = { column: -1, asc: true };
+        
+        function sortTable(columnIndex) {
+            const table = document.getElementById("containers-table");
+            const tbody = table.querySelector("tbody");
+            const rows = Array.from(tbody.querySelectorAll("tr"));
+            const headers = table.querySelectorAll("th");
+
+            let isAsc = true;
+            if (currentSort.column === columnIndex) {
+                isAsc = !currentSort.asc;
+            }
+            currentSort = { column: columnIndex, asc: isAsc };
+
+            headers.forEach((th, i) => {
+                const span = th.querySelector("span");
+                if (!span) return;
+                if (i === columnIndex) {
+                    span.innerHTML = isAsc ? "&#8593;" : "&#8595;";
+                    span.classList.add("text-zinc-900");
+                    span.classList.remove("text-zinc-300");
+                } else {
+                    span.innerHTML = "&#8597;";
+                    span.classList.remove("text-zinc-900");
+                    span.classList.add("text-zinc-300");
+                }
+            });
+
+            rows.sort((a, b) => {
+                let aCol = a.querySelectorAll("td")[columnIndex];
+                let bCol = b.querySelectorAll("td")[columnIndex];
+                
+                let aVal = aCol.getAttribute("data-sort") || "";
+                let bVal = bCol.getAttribute("data-sort") || "";
+
+                let aNum = parseFloat(aVal);
+                let bNum = parseFloat(bVal);
+
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return isAsc ? aNum - bNum : bNum - aNum;
+                }
+
+                aVal = aVal.toLowerCase();
+                bVal = bVal.toLowerCase();
+                
+                if (aVal < bVal) return isAsc ? -1 : 1;
+                if (aVal > bVal) return isAsc ? 1 : -1;
+                return 0;
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+        }
+    </script>
 </body>
+
 </html>
