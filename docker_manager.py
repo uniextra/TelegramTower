@@ -61,8 +61,12 @@ class DockerManager:
                     remote_info = RegistryFetcher.get_remote_image_info(image_name)
                     
                     is_same_version = False
-                    if remote_info and "config" in remote_info:
-                        remote_labels = remote_info["config"].get("Labels", {}) or {}
+                    if remote_info:
+                        remote_labels = (
+                            remote_info.get("labels")
+                            or remote_info.get("config", {}).get("Labels", {})
+                            or {}
+                        )
                         local_labels = image.attrs.get("Config", {}).get("Labels", {}) or {}
                         
                         # 1. Check opencontainers version label
@@ -128,11 +132,21 @@ class DockerManager:
                 logger.info(f"Stopping container {name}")
                 container.stop()
 
-            logger.info(f"Removing container {name}")
-            container.remove()
+            # Safe recreation with rollback: rename instead of deleting immediately
+            backup_name = f"{name}_tt_backup"
+            try:
+                try:
+                    old_backup = self.client.containers.get(backup_name)
+                    old_backup.remove(force=True)
+                except NotFound:
+                    pass
+                container.rename(backup_name)
+            except Exception as rename_e:
+                logger.warning(f"Could not rename {name} to {backup_name}: {rename_e}")
 
             logger.info(f"Recreating container {name}")
 
+            new_container = None
             try:
                 # Basic recreation logic mapping core attributes
                 # Copying labels is critical so Docker Compose doesn't lose track of the container
@@ -158,6 +172,22 @@ class DockerManager:
                     "labels": labels,
                 }
 
+                # Preserve advanced settings if configured
+                optional_attrs = [
+                    ("entrypoint", container_config.get("Entrypoint")),
+                    ("privileged", host_config.get("Privileged")),
+                    ("cap_add", host_config.get("CapAdd")),
+                    ("cap_drop", host_config.get("CapDrop")),
+                    ("devices", host_config.get("Devices")),
+                    ("dns", host_config.get("Dns")),
+                    ("extra_hosts", host_config.get("ExtraHosts")),
+                    ("shm_size", host_config.get("ShmSize")),
+                    ("user", container_config.get("User")),
+                ]
+                for key, val in optional_attrs:
+                    if val is not None:
+                        kwargs[key] = val
+
                 if is_running:
                     new_container = self.client.containers.run(detach=True, **kwargs)
                     logger.info(
@@ -180,8 +210,28 @@ class DockerManager:
                                 f"Failed to connect to additional network {net_name}: {net_e}"
                             )
 
-            except APIError as create_e:
+                # Successfully recreated and configured: remove backup container
+                try:
+                    container.remove(force=True)
+                except Exception as rm_e:
+                    logger.warning(f"Failed to remove backup container {backup_name}: {rm_e}")
+
+            except Exception as create_e:
                 logger.error(f"Failed to recreate container {name}: {create_e}")
+                # Rollback: remove partially created container if any
+                if new_container:
+                    try:
+                        new_container.remove(force=True)
+                    except Exception:
+                        pass
+                # Restore backup container
+                try:
+                    container.rename(name)
+                    if is_running:
+                        container.start()
+                    logger.info(f"Rollback successful: restored container {name}")
+                except Exception as rb_e:
+                    logger.error(f"Rollback failed for container {name}: {rb_e}")
                 return False, "err_recreate", {"error": str(create_e)}
 
             # Cleanup old image

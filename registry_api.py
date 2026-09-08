@@ -187,7 +187,13 @@ class RegistryFetcher:
                     or labels.get("org.label-schema.vcs-url")
                 )
 
-                return {"created": created, "version": version, "source": source}
+                return {
+                    "created": created,
+                    "version": version,
+                    "source": source,
+                    "labels": labels,
+                    "config": config_json.get("config", {}),
+                }
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Network error getting remote info for {image_name}: {e}")

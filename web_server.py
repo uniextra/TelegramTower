@@ -1,6 +1,7 @@
 import datetime
 import logging
 import os
+import secrets
 from functools import wraps
 from typing import Any, Callable
 
@@ -16,7 +17,9 @@ def check_auth(username: str, password: str) -> bool:
     pw = os.environ.get("WEB_PASSWORD")
     if not user or not pw:
         return True  # Auth disabled if not set
-    return username == user and password == pw
+    if username is None or password is None:
+        return False
+    return secrets.compare_digest(username, user) and secrets.compare_digest(password, pw)
 
 
 def authenticate() -> Response:

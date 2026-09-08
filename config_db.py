@@ -11,7 +11,9 @@ class ConfigDB:
         self._init_db()
 
     def _init_db(self) -> None:
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=15) as conn:
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS config (
                     key TEXT PRIMARY KEY,
@@ -38,7 +40,7 @@ class ConfigDB:
             conn.commit()
 
     def set_config(self, key: str, value: Any) -> None:
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=15) as conn:
             conn.execute(
                 """
                 INSERT INTO config (key, value)
@@ -50,7 +52,7 @@ class ConfigDB:
             conn.commit()
 
     def get_config(self, key: str, default: Any = None) -> Any:
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=15) as conn:
             cursor = conn.execute("SELECT value FROM config WHERE key = ?", (key,))
             row = cursor.fetchone()
             if row:
@@ -105,7 +107,7 @@ class ConfigDB:
         self.set_config(f"last_updated_{container_name}", timestamp)
         
     def get_all_last_updated(self) -> dict:
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=15) as conn:
             cursor = conn.execute("SELECT key, value FROM config WHERE key LIKE 'last_updated_%'")
             rows = cursor.fetchall()
             return {row[0].replace("last_updated_", ""): row[1] for row in rows}
@@ -132,7 +134,7 @@ class ConfigDB:
             return False
 
     def clear_snooze(self, container_name: str) -> None:
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=15) as conn:
             conn.execute("DELETE FROM config WHERE key = ?", (f"snooze_{container_name}",))
             conn.commit()
 
@@ -172,7 +174,7 @@ class ConfigDB:
         self.set_config("quarantine_days", days)
 
     def get_quarantine_record(self, container_name: str) -> Optional[Dict[str, Any]]:
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=15) as conn:
             cursor = conn.execute(
                 "SELECT detected_digest, detected_at, reset_count, remote_created_iso FROM quarantine_tracking WHERE container_name = ?",
                 (container_name,),
@@ -188,7 +190,7 @@ class ConfigDB:
             return None
 
     def get_all_quarantine_records(self) -> List[Dict[str, Any]]:
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=15) as conn:
             cursor = conn.execute(
                 "SELECT container_name, detected_digest, detected_at, reset_count, remote_created_iso FROM quarantine_tracking"
             )
@@ -214,7 +216,7 @@ class ConfigDB:
         import datetime
 
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=15) as conn:
             conn.execute(
                 """
                 INSERT INTO quarantine_tracking (container_name, detected_digest, detected_at, reset_count, remote_created_iso)
@@ -230,7 +232,7 @@ class ConfigDB:
             conn.commit()
 
     def delete_quarantine_record(self, container_name: str) -> None:
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=15) as conn:
             conn.execute(
                 "DELETE FROM quarantine_tracking WHERE container_name = ?",
                 (container_name,),
