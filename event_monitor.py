@@ -101,8 +101,8 @@ class EventMonitor:
 
                     elif "health_status" in action and self.config_db.get_events_notify_health():
                         if "health_status: healthy" in action:
-                            msg_es = f"❤️ Contenedor *{safe_name}* ahora está Healthy."
-                            msg_en = f"❤️ Container *{safe_name}* is now Healthy."
+                            msg_es = f"💚 Contenedor *{safe_name}* ahora está Healthy."
+                            msg_en = f"💚 Container *{safe_name}* is now Healthy."
                             self.telegram_callback(name, "healthy", msg_es if lang == "es" else msg_en)
                         elif "health_status: unhealthy" in action:
                             msg_es = f"🤒 *¡ALERTA!* Contenedor *{safe_name}* está Unhealthy."

@@ -13,7 +13,7 @@ TelegramTower is a lightweight, Watchtower-inspired Docker container update mana
 * **Dynamic Configuration:** Adjust settings like polling intervals and delays directly from an interactive Telegram menu without restarting the bot.
 * **GHCR Support:** Seamlessly works with GitHub Container Registry, Docker Hub, and private registries.
 * **Exclude Containers:** Easily exclude specific containers from updates using standard labels.
-* **Event Notifications:** Get instant real-time alerts when your containers start (✅), stop/crash (🔴), or change health status (❤️/🤒), fully customizable per container.
+* **Event Notifications:** Get instant real-time alerts when your containers start (✅), stop/crash (🔴), or change health status (💚/🤒), fully customizable per container.
 
 ## Web Dashboard
 
