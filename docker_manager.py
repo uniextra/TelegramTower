@@ -236,15 +236,18 @@ class DockerManager:
 
             # Cleanup old image
             cleaned_up = False
-            if cleanup_old_image:
+            if cleanup_old_image and old_image_id:
                 try:
-                    self.client.images.remove(str(old_image_id))
+                    # force=True allows removing the image even if it has multiple tags (like untagging)
+                    # Docker will still throw a 409 error if another container is actually using it.
+                    self.client.images.remove(image=str(old_image_id), force=True, noprune=False)
                     logger.info(f"Removed old image {old_image_id}")
                     cleaned_up = True
                 except APIError as clean_e:
-                    logger.warning(
-                        f"Failed to remove old image {old_image_id}: {clean_e}"
-                    )
+                    if clean_e.response is not None and clean_e.response.status_code == 409:
+                        logger.info(f"Skipped removing old image {old_image_id} as it is in use by another container.")
+                    else:
+                        logger.warning(f"Failed to remove old image {old_image_id}: {clean_e}")
 
             return (
                 True,
