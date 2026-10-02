@@ -9,7 +9,7 @@ TelegramTower is a lightweight, Watchtower-inspired Docker container update mana
 ## Features
 
 * **Approval & Auto-Update:** Receive interactive Telegram messages when an update is available to manually approve them, or enable **Auto-Update** per-container to apply them automatically.
-* **Compose & Network Aware:** Preserves Docker Compose labels and multiple network attachments when recreating containers, preventing broken stacks.
+* **Compose & Network Aware:** Preserves Docker Compose labels and multiple network attachments when recreating containers. It also **automatically detects and recreates dependent network containers** (e.g. `network_mode: service:vpn`) when their parent container is updated, preventing broken stacks.
 * **Dynamic Configuration:** Adjust settings like polling intervals and delays directly from an interactive Telegram menu without restarting the bot.
 * **GHCR Support:** Seamlessly works with GitHub Container Registry, Docker Hub, and private registries.
 * **Exclude Containers:** Easily exclude specific containers from updates using standard labels.
