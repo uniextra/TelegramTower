@@ -262,6 +262,7 @@ class DockerManager:
                 return False, "err_recreate", {"error": str(create_e)}
 
             # 4. Recreate dependents
+            recreated_dependents = []
             for dep in dependents:
                 logger.info(f"Recreating dependent container {dep.name}")
                 # If network_mode was container:id, we MUST update it to the new parent ID.
@@ -269,6 +270,7 @@ class DockerManager:
                 new_net_mode = f"container:{new_parent.name}"
                 try:
                     self._recreate_single_container(dep, network_mode_override=new_net_mode)
+                    recreated_dependents.append(dep.name)
                 except Exception as dep_e:
                     logger.error(f"Failed to recreate dependent container {dep.name}: {dep_e}")
 
@@ -290,7 +292,12 @@ class DockerManager:
             return (
                 True,
                 "update_success",
-                {"name": name, "was_running": is_running, "cleaned_up": cleaned_up},
+                {
+                    "name": name,
+                    "was_running": is_running,
+                    "cleaned_up": cleaned_up,
+                    "dependents": recreated_dependents,
+                },
             )
 
         except docker.errors.NotFound as e:

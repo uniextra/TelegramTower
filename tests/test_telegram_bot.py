@@ -73,3 +73,41 @@ async def test_button_handler_update(mock_docker_manager, mock_config_db, mocker
     mock_update.callback_query.edit_message_text.assert_called_with(
         text="✅ Success: Updated mycontainer and started successfully. Old image removed."
     )
+
+
+@pytest.mark.asyncio
+async def test_button_handler_update_with_dependents(mock_docker_manager, mock_config_db, mocker):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+
+    mock_container = MagicMock()
+    mock_container.name = "gluetun"
+    mock_container.id = "vpn123"
+    mock_docker_manager.get_containers.return_value = [mock_container]
+    mock_docker_manager.update_container.return_value = (
+        True,
+        "update_success",
+        {
+            "name": "gluetun",
+            "was_running": True,
+            "cleaned_up": True,
+            "dependents": ["radarr", "qbittorrent"],
+        },
+    )
+    mock_config_db.get_cleanup_old_image.return_value = True
+    mock_config_db.get_language.return_value = "es"
+
+    mock_update = MagicMock()
+    mock_update.callback_query.data = "update_gluetun"
+    mock_update.callback_query.answer = AsyncMock()
+    mock_update.callback_query.edit_message_text = AsyncMock()
+
+    mock_context = MagicMock()
+    await bot.button_handler(mock_update, mock_context)
+
+    expected_text = (
+        "✅ Éxito: Contenedor gluetun actualizado e iniciado con éxito. Imagen antigua eliminada.\n"
+        "🔗 Servicios dependientes del stack recreados: radarr, qbittorrent."
+    )
+    mock_update.callback_query.edit_message_text.assert_called_with(text=expected_text)
+

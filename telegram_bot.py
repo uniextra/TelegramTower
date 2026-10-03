@@ -6,6 +6,17 @@ from telegram.ext import Application, CallbackQueryHandler, CommandHandler, Cont
 
 logger = logging.getLogger(__name__)
 
+def escape_markdown(text: str) -> str:
+    """Escapes Telegram legacy Markdown special characters."""
+    if not text:
+        return ""
+    text = str(text)
+    text = text.replace("\\", "\\\\")
+    for char in ("_", "*", "[", "`"):
+        text = text.replace(char, f"\\{char}")
+    return text
+
+
 STRINGS = {
     "en": {
         "startup": "🤖 *TelegramTower has started!*\n\nI am ready to monitor your Docker containers.",
@@ -47,6 +58,7 @@ STRINGS = {
         "update_success_running": "Updated {name} and started successfully.{cleanup}",
         "update_success_stopped": "Updated {name} and recreated successfully (kept stopped).{cleanup}",
         "cleanup_removed": " Old image removed.",
+        "dependents_recreated": "\n🔗 Recreated dependent stack service(s): {deps}.",
         "already_up_to_date": "Container {name} is already up to date.",
         "err_recreate": "Failed to recreate container: {error}",
         "generic_error": "Error: {error}",
@@ -94,6 +106,7 @@ STRINGS = {
         "update_success_running": "Contenedor {name} actualizado e iniciado con éxito.{cleanup}",
         "update_success_stopped": "Contenedor {name} actualizado y recreado con éxito (mantenido detenido).{cleanup}",
         "cleanup_removed": " Imagen antigua eliminada.",
+        "dependents_recreated": "\n🔗 Servicios dependientes del stack recreados: {deps}.",
         "already_up_to_date": "El contenedor {name} ya está en la última versión.",
         "err_recreate": "Error al recrear el contenedor: {error}",
         "generic_error": "Error: {error}",
@@ -146,9 +159,14 @@ class TelegramBot:
                     if params.get("was_running")
                     else "update_success_stopped"
                 )
-                return self.t(
+                msg = self.t(
                     template_key, name=params.get("name", ""), cleanup=cleanup_str
                 )
+                deps = params.get("dependents", [])
+                if deps:
+                    deps_list = ", ".join(deps)
+                    msg += self.t("dependents_recreated", deps=deps_list)
+                return msg
             return self.t(key, **params)
         elif isinstance(result, tuple) and len(result) == 2:
             return result[1]
@@ -816,13 +834,21 @@ class TelegramBot:
                         self.config_db.set_last_updated(container.name, datetime.datetime.now(datetime.timezone.utc).isoformat())
                         msg = self.t(
                             "auto_updated_notification",
-                            container=container.name,
+                            container=escape_markdown(container.name),
                             image=new_image,
                         )
+                        deps = (
+                            result[2].get("dependents", [])
+                            if len(result) == 3 and isinstance(result[2], dict)
+                            else []
+                        )
+                        if deps:
+                            safe_deps = ", ".join([escape_markdown(d) for d in deps])
+                            msg += self.t("dependents_recreated", deps=safe_deps)
                         self.config_db.clear_snooze(container.name)
                     else:
                         msg = self.t(
-                            "auto_updating_msg", container=container.name
+                            "auto_updating_msg", container=escape_markdown(container.name)
                         ) + f"\n\nError: {msg_str}"
 
                     try:
