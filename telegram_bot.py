@@ -827,9 +827,14 @@ class TelegramBot:
                         self.docker_manager.update_container, container.id, cleanup
                     )
                     success = result[0]
+                    key = result[1] if len(result) > 1 else ""
                     msg_str = self.format_update_result(result)
                     
                     if success:
+                        if key == "already_up_to_date":
+                            logger.info(f"Container {container.name} is already up to date, skipping auto-update notification.")
+                            continue
+
                         import datetime
                         self.config_db.set_last_updated(container.name, datetime.datetime.now(datetime.timezone.utc).isoformat())
                         msg = self.t(

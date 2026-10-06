@@ -52,9 +52,9 @@ class DockerManager:
             # For a more robust approach, we need to inspect RepoDigests.
 
             if image and image.attrs.get("RepoDigests"):
-                local_digest = image.attrs["RepoDigests"][0]
+                local_digests = image.attrs["RepoDigests"]
                 # local_digest is like "ubuntu@sha256:..."
-                if remote_digest not in local_digest:
+                if not any(remote_digest in ld for ld in local_digests):
                     # Digest changed! Now fetch the actual creation date and info from the registry
                     from registry_api import RegistryFetcher
 
