@@ -55,6 +55,16 @@ STRINGS = {
         "quarantine_list_ui": "📋 *Quarantine List*\n\nHere are the containers currently in quarantine:\n\n{list}",
         "quarantine_list_empty": "No containers are currently in quarantine.",
         "quarantine_list_item": "• *{name}*: {days} day(s) remaining",
+        "btn_active_hours": "🕒 Active Hours",
+        "active_hours_ui": "🕒 *Active Hours (Horas Activas)*\n\nDuring active hours, automatic updates and restarts are paused to prevent interrupting active services (e.g. watching Plex).\n\n• State: *{state}*\n• Active Hours: *{start} - {end}*\n• Updates Window: *{end} - {start}*\n• Current Time: *{time}* ({status})\n\nSelect a preset or toggle state:",
+        "active_hours_status_active": "⏸️ Active (Updates Paused)",
+        "active_hours_status_inactive": "▶️ Inactive (Updates Allowed)",
+        "active_hours_preset_0802": "🌙 08:00 - 02:00",
+        "active_hours_preset_0901": "💤 09:00 - 01:00",
+        "active_hours_preset_0823": "☀️ 08:00 - 23:00",
+        "active_hours_preset_0918": "🏢 09:00 - 18:00",
+        "active_hours_cmd_help": "🕒 *Active Hours Configuration*\n\nUsage:\n`/activehours on` - Enable active hours\n`/activehours off` - Disable active hours\n`/activehours 08:00 02:00` - Set active hours from 08:00 to 02:00\n\nCurrent State: *{state}* ({start} - {end})",
+        "active_hours_updated": "🕒 Active hours updated: *{start} - {end}* ({state}). Updates allowed between *{end} - {start}*.",
         "update_success_running": "Updated {name} and started successfully.{cleanup}",
         "update_success_stopped": "Updated {name} and recreated successfully (kept stopped).{cleanup}",
         "cleanup_removed": " Old image removed.",
@@ -68,7 +78,7 @@ STRINGS = {
     },
     "es": {
         "startup": "🤖 *¡TelegramTower ha iniciado!*\n\nEstoy listo para monitorizar tus contenedores Docker.",
-        "settings_main": "⚙️ *Menú de Ajustes*\n\n• *Check Interval:* Cada cuánto tiempo verificaré actualizaciones.\n• *Request Delay:* Espera entre comprobaciones para evitar bloqueos por límite de peticiones.\n• *Cleanup Old Image:* Eliminar automáticamente la imagen antigua tras una actualización.\n• *Check Stopped:* Incluir contenedores detenidos en las comprobaciones.\n• *Quarantine:* Esperar X días antes de avisar/actualizar para evitar bugs de Día 0.",
+        "settings_main": "⚙️ *Menú de Ajustes*\n\n• *Check Interval:* Cada cuánto tiempo verificaré actualizaciones.\n• *Request Delay:* Espera entre comprobaciones para evitar bloqueos por límite de peticiones.\n• *Cleanup Old Image:* Eliminar automáticamente la imagen antigua tras una actualización.\n• *Check Stopped:* Incluir contenedores detenidos en las comprobaciones.\n• *Quarantine:* Esperar X días antes de avisar/actualizar para evitar bugs de Día 0.\n• *Active Hours:* Pausar actualizaciones automáticas durante horas de uso (ej. viendo Plex).",
         "settings_btn": "⚙️ Ajustes",
         "btn_interval": "⏱ Intervalo",
         "btn_delay": "⏳ Retraso",
@@ -79,6 +89,16 @@ STRINGS = {
         "quarantine_list_ui": "📋 *Lista de Cuarentena*\n\nContenedores actualmente en espera:\n\n{list}",
         "quarantine_list_empty": "No hay contenedores en cuarentena actualmente.",
         "quarantine_list_item": "• *{name}*: {days} día(s) restante(s)",
+        "btn_active_hours": "🕒 Horas Activas",
+        "active_hours_ui": "🕒 *Horas Activas*\n\nDurante las horas activas se pausan las actualizaciones automáticas y reinicios para no interrumpir servicios en uso (ej. viendo Plex).\n\n• Estado: *{state}*\n• Horas activas: *{start} - {end}*\n• Ventana de actualización: *{end} - {start}*\n• Hora actual: *{time}* ({status})\n\nSelecciona un ajuste rápido o activa/desactiva:",
+        "active_hours_status_active": "⏸️ En Horas Activas (Pausadas)",
+        "active_hours_status_inactive": "▶️ Fuera de Horas Activas (Permitidas)",
+        "active_hours_preset_0802": "🌙 08:00 - 02:00",
+        "active_hours_preset_0901": "💤 09:00 - 01:00",
+        "active_hours_preset_0823": "☀️ 08:00 - 23:00",
+        "active_hours_preset_0918": "🏢 09:00 - 18:00",
+        "active_hours_cmd_help": "🕒 *Configuración de Horas Activas*\n\nUso:\n`/activehours on` - Activar horas activas\n`/activehours off` - Desactivar horas activas\n`/activehours 08:00 02:00` - Definir horas activas de 08:00 a 02:00\n\nEstado actual: *{state}* ({start} - {end})",
+        "active_hours_updated": "🕒 Horas activas configuradas: *{start} - {end}* ({state}). Las actualizaciones se aplicarán entre *{end} - {start}*.",
         "interval_ui": "⏱ *Intervalo de Comprobación*\n\nActualmente comprobando cada *{days} día(s)*.\n\nSelecciona el nuevo intervalo:",
         "delay_ui": "⏳ *Retraso de Peticiones*\n\nActualmente esperando *{delay}s* entre contenedores.\n\nSelecciona el nuevo retraso:",
         "cleanup_ui": "🧹 *Limpiar Imagen Antigua*\n\nEstado actual: *{state}*.\n\nSi está activado, borraré la imagen antigua tras actualizar con éxito.",
@@ -132,6 +152,8 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("start", self.start))
         self.application.add_handler(CommandHandler("settings", self.settings_command))
         self.application.add_handler(CommandHandler("config", self.settings_command))
+        self.application.add_handler(CommandHandler("activehours", self.active_hours_command))
+        self.application.add_handler(CommandHandler("horasactivas", self.active_hours_command))
         self.application.add_handler(CallbackQueryHandler(self.button_handler))
         self.application.add_error_handler(self._error_handler)
 
@@ -221,6 +243,68 @@ class TelegramBot:
             [
                 InlineKeyboardButton(
                     self.t("btn_quarantine"), callback_data="menu_set_quarantine"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    self.t("btn_active_hours"), callback_data="menu_set_active_hours"
+                )
+            ],
+        ]
+        return msg, InlineKeyboardMarkup(keyboard)
+
+    def _get_active_hours_ui(self):
+        import datetime
+        enabled = self.config_db.get_active_hours_enabled()
+        state = self.t("enabled") if enabled else self.t("disabled")
+        start = self.config_db.get_active_hours_start()
+        end = self.config_db.get_active_hours_end()
+        now_time = datetime.datetime.now().strftime("%H:%M")
+        is_active = self.config_db.is_in_active_hours()
+        status = self.t("active_hours_status_active") if is_active else self.t("active_hours_status_inactive")
+
+        msg = self.t(
+            "active_hours_ui",
+            state=state,
+            start=start,
+            end=end,
+            time=now_time,
+            status=status,
+        )
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    f"{'✅ ' if enabled else ''}{self.t('enabled')}",
+                    callback_data="set_active_hours_1",
+                ),
+                InlineKeyboardButton(
+                    f"{'✅ ' if not enabled else ''}{self.t('disabled')}",
+                    callback_data="set_active_hours_0",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    f"{'✅ ' if (start == '08:00' and end == '02:00' and enabled) else ''}{self.t('active_hours_preset_0802')}",
+                    callback_data="set_active_hours_p_0800_0200",
+                ),
+                InlineKeyboardButton(
+                    f"{'✅ ' if (start == '09:00' and end == '01:00' and enabled) else ''}{self.t('active_hours_preset_0901')}",
+                    callback_data="set_active_hours_p_0900_0100",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    f"{'✅ ' if (start == '08:00' and end == '23:00' and enabled) else ''}{self.t('active_hours_preset_0823')}",
+                    callback_data="set_active_hours_p_0800_2300",
+                ),
+                InlineKeyboardButton(
+                    f"{'✅ ' if (start == '09:00' and end == '18:00' and enabled) else ''}{self.t('active_hours_preset_0918')}",
+                    callback_data="set_active_hours_p_0900_1800",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    self.t("btn_back"), callback_data="menu_main_settings"
                 )
             ],
         ]
@@ -418,8 +502,63 @@ class TelegramBot:
         msg, reply_markup = self._get_settings_main_ui()
         if update.message:
             await update.message.reply_text(
-            text=msg, reply_markup=reply_markup, parse_mode="Markdown"
+                text=msg, reply_markup=reply_markup, parse_mode="Markdown"
+            )
+
+    async def active_hours_command(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        self._update_language(update)
+        args = context.args or []
+        enabled = self.config_db.get_active_hours_enabled()
+        start = self.config_db.get_active_hours_start()
+        end = self.config_db.get_active_hours_end()
+        state_str = self.t("enabled") if enabled else self.t("disabled")
+
+        if not args:
+            msg = self.t(
+                "active_hours_cmd_help",
+                state=state_str,
+                start=start,
+                end=end,
+            )
+            if update.message:
+                await update.message.reply_text(msg, parse_mode="Markdown")
+            return
+
+        arg0 = args[0].lower()
+        if arg0 in ("on", "enable", "1", "true", "activar"):
+            self.config_db.set_active_hours_enabled(True)
+            state_str = self.t("enabled")
+        elif arg0 in ("off", "disable", "0", "false", "desactivar"):
+            self.config_db.set_active_hours_enabled(False)
+            state_str = self.t("disabled")
+        elif ":" in arg0 and len(args) >= 2 and ":" in args[1]:
+            self.config_db.set_active_hours_start(args[0])
+            self.config_db.set_active_hours_end(args[1])
+            self.config_db.set_active_hours_enabled(True)
+            start = args[0]
+            end = args[1]
+            state_str = self.t("enabled")
+        else:
+            msg = self.t(
+                "active_hours_cmd_help",
+                state=state_str,
+                start=start,
+                end=end,
+            )
+            if update.message:
+                await update.message.reply_text(msg, parse_mode="Markdown")
+            return
+
+        reply_msg = self.t(
+            "active_hours_updated",
+            start=self.config_db.get_active_hours_start(),
+            end=self.config_db.get_active_hours_end(),
+            state=state_str,
         )
+        if update.message:
+            await update.message.reply_text(reply_msg, parse_mode="Markdown")
 
     async def send_update_notification(
         self, container_name, new_image, is_stopped=False, remote_info=None, is_same_version=False, reset_count=0
@@ -544,6 +683,12 @@ class TelegramBot:
                 text=msg, reply_markup=markup, parse_mode="Markdown"
             )
             return
+        elif data == "menu_set_active_hours":
+            msg, markup = self._get_active_hours_ui()
+            await query.edit_message_text(
+                text=msg, reply_markup=markup, parse_mode="Markdown"
+            )
+            return
 
         # Setting values
         if data.startswith("set_interval_"):
@@ -587,6 +732,26 @@ class TelegramBot:
             days = int(data.split("_")[-1])
             self.config_db.set_quarantine_days(days)
             msg, markup = self._get_quarantine_ui()
+            await query.edit_message_text(
+                text=msg, reply_markup=markup, parse_mode="Markdown"
+            )
+            return
+
+        if data.startswith("set_active_hours_"):
+            if data == "set_active_hours_1":
+                self.config_db.set_active_hours_enabled(True)
+            elif data == "set_active_hours_0":
+                self.config_db.set_active_hours_enabled(False)
+            elif data.startswith("set_active_hours_p_"):
+                raw = data.replace("set_active_hours_p_", "")
+                parts = raw.split("_")
+                if len(parts) == 2 and len(parts[0]) == 4 and len(parts[1]) == 4:
+                    start_str = f"{parts[0][:2]}:{parts[0][2:]}"
+                    end_str = f"{parts[1][:2]}:{parts[1][2:]}"
+                    self.config_db.set_active_hours_start(start_str)
+                    self.config_db.set_active_hours_end(end_str)
+                    self.config_db.set_active_hours_enabled(True)
+            msg, markup = self._get_active_hours_ui()
             await query.edit_message_text(
                 text=msg, reply_markup=markup, parse_mode="Markdown"
             )
@@ -821,6 +986,16 @@ class TelegramBot:
                 db_auto = self.config_db.get_auto_update(container.name)
 
                 if label_auto or db_auto:
+                    if self.config_db.is_in_active_hours():
+                        start_time = self.config_db.get_active_hours_start()
+                        end_time = self.config_db.get_active_hours_end()
+                        logger.info(
+                            f"Active hours in effect ({start_time} - {end_time}). "
+                            f"Auto-update for container '{container.name}' deferred until active hours end."
+                        )
+                        self._schedule_deferred_active_hours_check()
+                        continue
+
                     logger.info(f"Auto-updating {container.name}...")
                     cleanup = self.config_db.get_cleanup_old_image()
                     result = await asyncio.to_thread(
@@ -880,6 +1055,28 @@ class TelegramBot:
             else:
                 logger.info(f"No update for {container.name}")
                 self.config_db.delete_quarantine_record(container.name)
+
+    def _schedule_deferred_active_hours_check(self):
+        """Schedules a one-off container check right after active hours end."""
+        secs = self.config_db.get_seconds_until_active_hours_end()
+        run_in = max(30, secs + 30)
+
+        if getattr(self, "_deferred_active_hours_job", None):
+            return
+
+        logger.info(
+            f"Active hours in effect. Scheduling deferred container check in {run_in}s."
+        )
+
+        async def _run_deferred_job(context: ContextTypes.DEFAULT_TYPE):
+            self._deferred_active_hours_job = None
+            logger.info("Active hours window ended. Running deferred container check...")
+            await self._check_containers_job(context)
+
+        if self.application and self.application.job_queue:
+            self._deferred_active_hours_job = self.application.job_queue.run_once(
+                _run_deferred_job, when=run_in
+            )
 
     async def _send_startup_message(self, context: ContextTypes.DEFAULT_TYPE):
         msg, reply_markup = self._get_startup_ui()

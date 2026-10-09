@@ -30,8 +30,22 @@
                 <img src="{{ url_for('static', filename='logo.jpg') }}" alt="TelegramTower Logo" class="h-12 w-12 rounded-xl shadow-sm border border-zinc-200">
                 <h1 class="text-3xl font-bold tracking-tight text-zinc-950">TelegramTower</h1>
             </div>
-            <div class="inline-flex items-center rounded-full border border-zinc-200 bg-white px-3 py-1 text-sm font-medium text-zinc-900 shadow-sm transition-colors hover:bg-zinc-50">
-                {{ containers|length }} Containers
+            <div class="flex items-center gap-2">
+                {% if settings.active_hours_enabled %}
+                <div class="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700 shadow-sm" title="Active Hours: {{ settings.active_hours_start }} - {{ settings.active_hours_end }}">
+                    🕒 Horas Activas: {{ settings.active_hours_start }} - {{ settings.active_hours_end }}
+                    {% if settings.is_in_active_hours %}
+                    <span class="inline-block w-2 h-2 rounded-full bg-amber-500" title="Updates Paused"></span>
+                    <span class="text-[11px] text-amber-700 font-semibold">Pausadas</span>
+                    {% else %}
+                    <span class="inline-block w-2 h-2 rounded-full bg-emerald-500" title="Updates Allowed"></span>
+                    <span class="text-[11px] text-emerald-700 font-semibold">Permitidas</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+                <div class="inline-flex items-center rounded-full border border-zinc-200 bg-white px-3 py-1 text-sm font-medium text-zinc-900 shadow-sm transition-colors hover:bg-zinc-50">
+                    {{ containers|length }} Containers
+                </div>
             </div>
         </header>
 
@@ -169,6 +183,56 @@
                                     <input type="hidden" name="events_whitelist_only" value="on">
                                     {% endif %}
                                 </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Active Hours (Horas Activas) Section -->
+                        <div class="mt-4 pt-4 border-t border-zinc-100">
+                            <div class="flex items-center justify-between mb-3">
+                                <div>
+                                    <h4 class="text-sm font-medium text-zinc-900 flex items-center" title="Define hours when services are actively in use (like Windows Update Active Hours). Automatic updates and restarts will be paused during this period.">
+                                        🕒 Horas Activas (Active Hours)
+                                        <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><title>Pause automatic container updates/restarts during active use (e.g. while watching Plex).</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    </h4>
+                                    <p class="text-xs text-zinc-500">Pausar actualizaciones automáticas durante horas de uso (ej. Plex)</p>
+                                </div>
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
+                                    <input type="checkbox" name="active_hours_enabled" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.active_hours_enabled %}checked{% endif %}>
+                                    <span>Activar</span>
+                                </label>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="space-y-1">
+                                    <label class="text-xs font-medium text-zinc-700 flex items-center">
+                                        Inicio (Pausar)
+                                        <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><title>Hora a partir de la cual no se aplicarán actualizaciones automáticas.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    </label>
+                                    <input type="time" name="active_hours_start" value="{{ settings.active_hours_start }}" class="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-medium text-zinc-700 flex items-center">
+                                        Fin (Reanudar)
+                                        <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><title>Hora a partir de la cual finalizan las horas activas y se permiten actualizaciones automáticas.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    </label>
+                                    <input type="time" name="active_hours_end" value="{{ settings.active_hours_end }}" class="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+                                </div>
+                            </div>
+
+                            <div class="mt-2 text-xs text-zinc-500 flex items-center justify-between">
+                                <span>Ventana de actualización: <strong>{{ settings.active_hours_end }}</strong> a <strong>{{ settings.active_hours_start }}</strong></span>
+                                <span class="inline-flex items-center gap-1.5">
+                                    {% if settings.active_hours_enabled %}
+                                        {% if settings.is_in_active_hours %}
+                                            <span class="inline-block w-2 h-2 rounded-full bg-amber-500"></span> <span class="text-amber-700 font-medium">Pausadas ahora</span>
+                                        {% else %}
+                                            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span> <span class="text-emerald-700 font-medium">Ventana abierta</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="inline-block w-2 h-2 rounded-full bg-zinc-300"></span> Desactivado
+                                    {% endif %}
+                                    <span class="text-zinc-400">({{ settings.server_time }})</span>
+                                </span>
                             </div>
                         </div>
                         

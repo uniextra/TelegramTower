@@ -14,6 +14,7 @@ TelegramTower is a lightweight, Watchtower-inspired Docker container update mana
 * **GHCR Support:** Seamlessly works with GitHub Container Registry, Docker Hub, and private registries.
 * **Exclude Containers:** Easily exclude specific containers from updates using standard labels.
 * **Event Notifications:** Get instant real-time alerts when your containers start (✅), stop/crash (🔴), or change health status (💚/🤒), fully customizable per container.
+* **Active Hours (Horas Activas):** Set custom active hours (inspired by Windows Update) where automatic updates and restarts are paused (e.g. `08:00 - 02:00`) so services like Plex are never interrupted while in use. Pending updates are automatically deferred and applied during the maintenance window.
 
 ## Web Dashboard
 
@@ -90,6 +91,14 @@ services:
       # - "telegramtower.autoupdate=true"
 ```
 
+### 5. Active Hours (Maintenance Window)
+To avoid interrupting services while you are actively using them (e.g. streaming on Plex), you can define **Active Hours** (inspired by Windows Update):
+* During Active Hours (e.g. `08:00 - 02:00`), automatic container updates and restarts are paused.
+* When Active Hours end (e.g. overnight from `02:00` to `08:00`), TelegramTower automatically runs pending updates in the background.
+* Configurable directly in the **Web Dashboard** or via Telegram:
+  * Open `/settings` and tap **🕒 Horas Activas**.
+  * Or use quick chat commands: `/activehours 08:00 02:00`, `/activehours on`, or `/activehours off`.
+
 ## Settings Configuration
 The bot has a robust `/settings` menu built right into Telegram. You can configure:
 - **Check Interval:** How often to check for updates (1, 7, or 30 days).
@@ -97,6 +106,7 @@ The bot has a robust `/settings` menu built right into Telegram. You can configu
 - **Cleanup Old Image:** Automatically delete old images after a successful update.
 - **Check Stopped:** Include stopped containers in the update checks.
 - **Quarantine Delay:** Delay update notifications for a specified number of days (1, 3, 5, 7 days) to ensure stability and protect against "day 0" bugs or compromised tags. If an image is updated 3 times rapidly during this period, you will receive a manual review warning.
+- **Active Hours (Horas Activas):** Pause automatic updates and container restarts during active usage hours (e.g. `08:00 - 02:00`). Any pending auto-updates will be postponed and automatically applied once active hours end (the update window, e.g. `02:00 - 08:00`). Configurable via Telegram (`/settings` or `/activehours 08:00 02:00`) and the Web Dashboard.
 
 ### Container-Specific Quarantine
 You can override the global Quarantine setting for specific containers by adding the `telegramtower.quarantine` label. Set the value to the number of days to wait, or `0` to bypass the delay entirely:

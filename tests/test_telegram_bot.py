@@ -111,3 +111,109 @@ async def test_button_handler_update_with_dependents(mock_docker_manager, mock_c
     )
     mock_update.callback_query.edit_message_text.assert_called_with(text=expected_text)
 
+
+@pytest.mark.asyncio
+async def test_active_hours_command(mock_docker_manager, mock_config_db, mocker):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+    mock_config_db.get_language.return_value = "es"
+    mock_config_db.get_active_hours_enabled.return_value = False
+    mock_config_db.get_active_hours_start.return_value = "08:00"
+    mock_config_db.get_active_hours_end.return_value = "02:00"
+
+    # Test /activehours with no args
+    update = MagicMock()
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.args = []
+    await bot.active_hours_command(update, context)
+    update.message.reply_text.assert_called_once()
+    assert "Configuración de Horas Activas" in update.message.reply_text.call_args[0][0]
+
+    # Test /activehours on
+    update.message.reply_text.reset_mock()
+    context.args = ["on"]
+    await bot.active_hours_command(update, context)
+    mock_config_db.set_active_hours_enabled.assert_called_with(True)
+    update.message.reply_text.assert_called_once()
+
+    # Test /activehours 09:00 01:00
+    update.message.reply_text.reset_mock()
+    context.args = ["09:00", "01:00"]
+    await bot.active_hours_command(update, context)
+    mock_config_db.set_active_hours_start.assert_called_with("09:00")
+    mock_config_db.set_active_hours_end.assert_called_with("01:00")
+    mock_config_db.set_active_hours_enabled.assert_called_with(True)
+    update.message.reply_text.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_button_handler_active_hours(mock_docker_manager, mock_config_db, mocker):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+    mock_config_db.get_language.return_value = "es"
+    mock_config_db.get_active_hours_enabled.return_value = False
+    mock_config_db.get_active_hours_start.return_value = "08:00"
+    mock_config_db.get_active_hours_end.return_value = "02:00"
+    mock_config_db.is_in_active_hours.return_value = False
+
+    # Open active hours menu
+    update = MagicMock()
+    update.callback_query.data = "menu_set_active_hours"
+    update.callback_query.answer = AsyncMock()
+    update.callback_query.edit_message_text = AsyncMock()
+    context = MagicMock()
+
+    await bot.button_handler(update, context)
+    update.callback_query.edit_message_text.assert_called_once()
+    assert "Horas Activas" in update.callback_query.edit_message_text.call_args[1]["text"]
+
+    # Toggle enable
+    update.callback_query.data = "set_active_hours_1"
+    await bot.button_handler(update, context)
+    mock_config_db.set_active_hours_enabled.assert_called_with(True)
+
+    # Preset 08:00 - 02:00
+    update.callback_query.data = "set_active_hours_p_0800_0200"
+    await bot.button_handler(update, context)
+    mock_config_db.set_active_hours_start.assert_called_with("08:00")
+    mock_config_db.set_active_hours_end.assert_called_with("02:00")
+    mock_config_db.set_active_hours_enabled.assert_called_with(True)
+
+
+@pytest.mark.asyncio
+async def test_check_containers_job_defers_during_active_hours(mock_docker_manager, mock_config_db, mocker):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+
+    # Setup container with auto-update
+    mock_container = MagicMock()
+    mock_container.name = "plex"
+    mock_container.id = "plex123"
+    mock_container.status = "running"
+    mock_container.labels = {}
+    mock_docker_manager.get_containers.return_value = [mock_container]
+    mock_docker_manager.check_for_updates.return_value = ("plex:latest", "sha256:abc", {}, False)
+
+    mock_config_db.is_snoozed.return_value = False
+    mock_config_db.get_ignored_update.return_value = None
+    mock_config_db.get_quarantine_days.return_value = 0
+    mock_config_db.get_quarantine_record.return_value = None
+    mock_config_db.get_auto_update.return_value = True
+    # Active hours is IN EFFECT
+    mock_config_db.is_in_active_hours.return_value = True
+    mock_config_db.get_active_hours_start.return_value = "08:00"
+    mock_config_db.get_active_hours_end.return_value = "02:00"
+    mock_config_db.get_seconds_until_active_hours_end.return_value = 3600
+
+    bot._schedule_deferred_active_hours_check = MagicMock()
+
+    context = MagicMock()
+    await bot._check_containers_job(context)
+
+    # Must NOT call update_container during active hours
+    mock_docker_manager.update_container.assert_not_called()
+    # Must have called schedule deferred check
+    bot._schedule_deferred_active_hours_check.assert_called_once()
+
+

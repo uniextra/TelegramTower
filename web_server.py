@@ -81,6 +81,14 @@ def dashboard() -> Any:
                 config_db.set_events_notify_stop(request.form.get("events_notify_stop") == "on")
                 config_db.set_events_notify_health(request.form.get("events_notify_health") == "on")
                 config_db.set_events_whitelist_only(request.form.get("events_whitelist_only") == "on")
+                
+                config_db.set_active_hours_enabled(request.form.get("active_hours_enabled") == "on")
+                start_time = request.form.get("active_hours_start", "").strip()
+                if start_time:
+                    config_db.set_active_hours_start(start_time)
+                end_time = request.form.get("active_hours_end", "").strip()
+                if end_time:
+                    config_db.set_active_hours_end(end_time)
             elif action == "toggle_auto_update":
                 container_name = request.form.get("container_name")
                 if container_name:
@@ -121,6 +129,11 @@ def dashboard() -> Any:
             "events_notify_health": config_db.get_events_notify_health(),
             "events_whitelist_only": config_db.get_events_whitelist_only() or env_only_whitelist,
             "env_only_whitelist": env_only_whitelist,
+            "active_hours_enabled": config_db.get_active_hours_enabled(),
+            "active_hours_start": config_db.get_active_hours_start(),
+            "active_hours_end": config_db.get_active_hours_end(),
+            "is_in_active_hours": config_db.is_in_active_hours(),
+            "server_time": datetime.datetime.now().strftime("%H:%M"),
         }
 
         last_updated_dict = config_db.get_all_last_updated()

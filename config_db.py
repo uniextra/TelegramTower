@@ -1,3 +1,4 @@
+import datetime
 import os
 import sqlite3
 from typing import Any, Dict, List, Optional
@@ -238,3 +239,76 @@ class ConfigDB:
                 (container_name,),
             )
             conn.commit()
+
+    # --- Active Hours (Horas Activas) ---
+    def get_active_hours_enabled(self) -> bool:
+        return self.get_config("active_hours_enabled", "0") == "1"
+
+    def set_active_hours_enabled(self, enabled: bool) -> None:
+        self.set_config("active_hours_enabled", "1" if enabled else "0")
+
+    def get_active_hours_start(self) -> str:
+        return self.get_config("active_hours_start", "08:00")
+
+    def set_active_hours_start(self, time_str: str) -> None:
+        self.set_config("active_hours_start", time_str)
+
+    def get_active_hours_end(self) -> str:
+        return self.get_config("active_hours_end", "02:00")
+
+    def set_active_hours_end(self, time_str: str) -> None:
+        self.set_config("active_hours_end", time_str)
+
+    def is_in_active_hours(self, dt: Optional[datetime.datetime] = None) -> bool:
+        """
+        Returns True if dt (or datetime.now()) falls within the configured active hours.
+        During active hours, automatic updates should not restart services.
+        """
+        if not self.get_active_hours_enabled():
+            return False
+
+        start_str = self.get_active_hours_start()
+        end_str = self.get_active_hours_end()
+        if not start_str or not end_str:
+            return False
+
+        try:
+            start_parts = [int(p) for p in start_str.split(":")]
+            end_parts = [int(p) for p in end_str.split(":")]
+            start_time = datetime.time(start_parts[0], start_parts[1])
+            end_time = datetime.time(end_parts[0], end_parts[1])
+        except Exception:
+            return False
+
+        if dt is None:
+            dt = datetime.datetime.now()
+        current_time = dt.time()
+
+        if start_time < end_time:
+            return start_time <= current_time < end_time
+        elif start_time > end_time:
+            # Spans across midnight (e.g. 08:00 to 02:00)
+            return current_time >= start_time or current_time < end_time
+        else:
+            # start == end -> covers entire 24h
+            return True
+
+    def get_seconds_until_active_hours_end(self, dt: Optional[datetime.datetime] = None) -> int:
+        """
+        Calculates the seconds remaining until the active hours window ends.
+        """
+        if dt is None:
+            dt = datetime.datetime.now()
+        end_str = self.get_active_hours_end()
+        try:
+            end_parts = [int(p) for p in end_str.split(":")]
+            end_h, end_m = end_parts[0], end_parts[1]
+        except Exception:
+            return 0
+
+        target_dt = dt.replace(hour=end_h, minute=end_m, second=0, microsecond=0)
+        if target_dt <= dt:
+            target_dt += datetime.timedelta(days=1)
+
+        diff = int((target_dt - dt).total_seconds())
+        return max(0, diff)
