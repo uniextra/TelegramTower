@@ -217,3 +217,74 @@ async def test_check_containers_job_defers_during_active_hours(mock_docker_manag
     bot._schedule_deferred_active_hours_check.assert_called_once()
 
 
+@pytest.mark.asyncio
+async def test_language_command(mock_docker_manager, mock_config_db, mocker):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+
+    update = MagicMock()
+    update.message = AsyncMock()
+    context = MagicMock()
+
+    # /language es
+    context.args = ["es"]
+    await bot.language_command(update, context)
+    mock_config_db.set_language.assert_called_with("es")
+    update.message.reply_text.assert_called()
+
+    # /language en
+    context.args = ["en"]
+    await bot.language_command(update, context)
+    mock_config_db.set_language.assert_called_with("en")
+
+    # /language without args shows menu
+    context.args = []
+    await bot.language_command(update, context)
+    assert update.message.reply_text.call_count >= 3
+
+
+@pytest.mark.asyncio
+async def test_button_handler_language(mock_docker_manager, mock_config_db, mocker):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+
+    update = MagicMock()
+    update.callback_query = AsyncMock()
+    context = MagicMock()
+
+    # Open language menu
+    update.callback_query.data = "menu_set_language"
+    await bot.button_handler(update, context)
+    update.callback_query.edit_message_text.assert_called()
+
+    # Set Spanish
+    update.callback_query.data = "set_lang_es"
+    await bot.button_handler(update, context)
+    mock_config_db.set_language.assert_called_with("es")
+
+    # Set English
+    update.callback_query.data = "set_lang_en"
+    await bot.button_handler(update, context)
+    mock_config_db.set_language.assert_called_with("en")
+
+
+def test_update_language_respects_manual_config(mock_docker_manager, mock_config_db, mocker):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+
+    update = MagicMock()
+    update.effective_user = MagicMock()
+    update.effective_user.language_code = "en"
+
+    # If language is already explicitly set in DB, do not overwrite
+    mock_config_db.get_config.return_value = "es"
+    bot._update_language(update)
+    mock_config_db.set_language.assert_not_called()
+
+    # If language is not set in DB, auto-detect
+    mock_config_db.get_config.return_value = None
+    bot._update_language(update)
+    mock_config_db.set_language.assert_called_with("en")
+
+
+

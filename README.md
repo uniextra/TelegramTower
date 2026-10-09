@@ -15,11 +15,13 @@ TelegramTower is a lightweight, Watchtower-inspired Docker container update mana
 * **Exclude Containers:** Easily exclude specific containers from updates using standard labels.
 * **Event Notifications:** Get instant real-time alerts when your containers start (✅), stop/crash (🔴), or change health status (💚/🤒), fully customizable per container.
 * **Active Hours (Horas Activas):** Set custom active hours (inspired by Windows Update) where automatic updates and restarts are paused (e.g. `08:00 - 02:00`) so services like Plex are never interrupted while in use. Pending updates are automatically deferred and applied during the maintenance window.
+* **Multi-Language Support (EN / ES):** Full internationalization in both the Web Dashboard and Telegram. Switch dynamically between English and Spanish via the header toggle or `/language` / `/idioma` commands.
 
 ## Web Dashboard
 
 TelegramTower includes a built-in Web Dashboard available at port `8080`.
 * **Global Overview:** View all your containers, their current status, auto-update settings, and quarantine time left at a glance.
+* **Language Switcher:** Instant one-click toggle between English and Spanish in the header, fully synchronized with backend settings.
 * **Token Management:** Configure your `TELEGRAM_BOT_TOKEN` directly from the web interface (any conflicts with environment variables will be highlighted).
 * **Security:** Protect the dashboard with Basic Auth by setting `WEB_USER` and `WEB_PASSWORD` environment variables.
 
@@ -107,6 +109,7 @@ The bot has a robust `/settings` menu built right into Telegram. You can configu
 - **Check Stopped:** Include stopped containers in the update checks.
 - **Quarantine Delay:** Delay update notifications for a specified number of days (1, 3, 5, 7 days) to ensure stability and protect against "day 0" bugs or compromised tags. If an image is updated 3 times rapidly during this period, you will receive a manual review warning.
 - **Active Hours (Horas Activas):** Pause automatic updates and container restarts during active usage hours (e.g. `08:00 - 02:00`). Any pending auto-updates will be postponed and automatically applied once active hours end (the update window, e.g. `02:00 - 08:00`). Configurable via Telegram (`/settings` or `/activehours 08:00 02:00`) and the Web Dashboard.
+- **Language / Idioma:** Switch bot notifications, menus, and commands between English and Spanish via `/settings`, `/language en/es`, or `/idioma en/es`.
 
 ### Container-Specific Quarantine
 You can override the global Quarantine setting for specific containers by adding the `telegramtower.quarantine` label. Set the value to the number of days to wait, or `0` to bypass the delay entirely:

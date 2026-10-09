@@ -20,12 +20,16 @@ def escape_markdown(text: str) -> str:
 STRINGS = {
     "en": {
         "startup": "🤖 *TelegramTower has started!*\n\nI am ready to monitor your Docker containers.",
-        "settings_main": "⚙️ *Settings Menu*\n\n• *Check Interval:* How often I check for container updates.\n• *Request Delay:* Wait time between checks to avoid rate limits.\n• *Cleanup Old Image:* Automatically delete old images after successful updates.\n• *Check Stopped:* Include stopped containers in the update checks.",
+        "settings_main": "⚙️ *Settings Menu*\n\n• *Check Interval:* How often I check for container updates.\n• *Request Delay:* Wait time between checks to avoid rate limits.\n• *Cleanup Old Image:* Automatically delete old images after successful updates.\n• *Check Stopped:* Include stopped containers in the update checks.\n• *Quarantine:* Delay notifications for new updates to prevent Day-0 bugs.\n• *Active Hours:* Pause automatic updates during active usage hours (e.g. Plex).\n• *Language:* Choose English or Spanish for bot notifications and UI.",
         "settings_btn": "⚙️ Settings",
         "btn_interval": "⏱ Check Interval",
         "btn_delay": "⏳ Request Delay",
         "btn_cleanup": "🧹 Cleanup Old Image",
         "btn_stopped": "🛑 Check Stopped",
+        "btn_quarantine": "🛡️ Quarantine Delay",
+        "btn_quarantine_list": "📋 View Quarantine List",
+        "btn_active_hours": "🕒 Active Hours",
+        "btn_language": "🌐 Language / Idioma",
         "interval_ui": "⏱ *Check Interval*\n\nCurrently checking every *{days} day(s)*.\n\nSelect a new interval:",
         "delay_ui": "⏳ *Request Delay*\n\nCurrently pausing for *{delay}s* between checks.\n\nSelect a new delay:",
         "cleanup_ui": "🧹 *Cleanup Old Image*\n\nCurrent state: *{state}*.\n\nIf enabled, I will delete the old image after a successful update.",
@@ -33,7 +37,10 @@ STRINGS = {
         "btn_back": "🔙 Back to Settings",
         "enabled": "Enabled",
         "disabled": "Disabled",
+        "day_0": "0 Days (Off)",
         "day_1": "1 Day",
+        "days_3": "3 Days",
+        "days_5": "5 Days",
         "days_7": "7 Days",
         "days_30": "30 Days",
         "update_btn": "Update",
@@ -45,17 +52,11 @@ STRINGS = {
         "updating_msg": "Updating {container}... please wait.",
         "auto_updating_msg": "Updating {container}... and setting to auto-update in the future.",
         "auto_updated_notification": "🚀 Automatically updated container *{container}* to new image:\n`{image}`",
-        "btn_quarantine": "🛡️ Quarantine Delay",
         "quarantine_ui": "🛡️ *Quarantine Delay*\n\nCurrently delaying updates for *{days} day(s)*.\n\nSelect a new delay (0 to disable):",
         "quarantine_warning": "⚠️ *Warning:* Container `{container}` has skipped the quarantine period 3 times due to rapid updates.\n\nPlease check it manually to ensure it's stable.",
-        "day_0": "0 Days (Off)",
-        "days_3": "3 Days",
-        "days_5": "5 Days",
-        "btn_quarantine_list": "📋 View Quarantine List",
         "quarantine_list_ui": "📋 *Quarantine List*\n\nHere are the containers currently in quarantine:\n\n{list}",
         "quarantine_list_empty": "No containers are currently in quarantine.",
         "quarantine_list_item": "• *{name}*: {days} day(s) remaining",
-        "btn_active_hours": "🕒 Active Hours",
         "active_hours_ui": "🕒 *Active Hours (Horas Activas)*\n\nDuring active hours, automatic updates and restarts are paused to prevent interrupting active services (e.g. watching Plex).\n\n• State: *{state}*\n• Active Hours: *{start} - {end}*\n• Updates Window: *{end} - {start}*\n• Current Time: *{time}* ({status})\n\nSelect a preset or toggle state:",
         "active_hours_status_active": "⏸️ Active (Updates Paused)",
         "active_hours_status_inactive": "▶️ Inactive (Updates Allowed)",
@@ -65,6 +66,16 @@ STRINGS = {
         "active_hours_preset_0918": "🏢 09:00 - 18:00",
         "active_hours_cmd_help": "🕒 *Active Hours Configuration*\n\nUsage:\n`/activehours on` - Enable active hours\n`/activehours off` - Disable active hours\n`/activehours 08:00 02:00` - Set active hours from 08:00 to 02:00\n\nCurrent State: *{state}* ({start} - {end})",
         "active_hours_updated": "🕒 Active hours updated: *{start} - {end}* ({state}). Updates allowed between *{end} - {start}*.",
+        "language_ui": "🌐 *Language / Idioma*\n\nSelect your preferred language for Telegram notifications and commands:\n\nCurrently set to: *{lang}*",
+        "lang_en": "English (Inglés)",
+        "lang_es": "Spanish (Español)",
+        "lang_changed": "🌐 Language changed to *English*.",
+        "language_cmd_help": "🌐 *Language Selection*\n\nUsage:\n`/language en` or `/idioma en` - English\n`/language es` or `/idioma es` - Spanish\n\nCurrent language: *{lang}*",
+        "spammy_update_warning": "⚠️ *WARNING!* Repetitive updates detected for *{container}*.\nMetadata indicates this is the same version or automated nightly builds.\n\nWould you like to mute this container for 30 days?",
+        "snooze_btn": "🔕 Snooze 30d",
+        "snoozed_msg": "🔕 Container *{container}* snoozed for 30 days.",
+        "version_label": "Version",
+        "source_label": "Changelog / Source",
         "update_success_running": "Updated {name} and started successfully.{cleanup}",
         "update_success_stopped": "Updated {name} and recreated successfully (kept stopped).{cleanup}",
         "cleanup_removed": " Old image removed.",
@@ -78,7 +89,7 @@ STRINGS = {
     },
     "es": {
         "startup": "🤖 *¡TelegramTower ha iniciado!*\n\nEstoy listo para monitorizar tus contenedores Docker.",
-        "settings_main": "⚙️ *Menú de Ajustes*\n\n• *Check Interval:* Cada cuánto tiempo verificaré actualizaciones.\n• *Request Delay:* Espera entre comprobaciones para evitar bloqueos por límite de peticiones.\n• *Cleanup Old Image:* Eliminar automáticamente la imagen antigua tras una actualización.\n• *Check Stopped:* Incluir contenedores detenidos en las comprobaciones.\n• *Quarantine:* Esperar X días antes de avisar/actualizar para evitar bugs de Día 0.\n• *Active Hours:* Pausar actualizaciones automáticas durante horas de uso (ej. viendo Plex).",
+        "settings_main": "⚙️ *Menú de Ajustes*\n\n• *Intervalo:* Cada cuánto tiempo verificaré actualizaciones.\n• *Retraso de peticiones:* Espera entre comprobaciones para evitar bloqueos por límite de peticiones.\n• *Limpiar imagen:* Eliminar automáticamente la imagen antigua tras una actualización.\n• *Contenedores detenidos:* Incluir contenedores detenidos en las comprobaciones.\n• *Cuarentena:* Esperar X días antes de avisar/actualizar para evitar bugs de Día 0.\n• *Horas Activas:* Pausar actualizaciones automáticas durante horas de uso (ej. viendo Plex).\n• *Idioma:* Cambiar entre Español e Inglés.",
         "settings_btn": "⚙️ Ajustes",
         "btn_interval": "⏱ Intervalo",
         "btn_delay": "⏳ Retraso",
@@ -86,10 +97,11 @@ STRINGS = {
         "btn_stopped": "🛑 Detenidos",
         "btn_quarantine": "🛡️ Cuarentena",
         "btn_quarantine_list": "📋 Ver Lista Cuarentena",
+        "btn_active_hours": "🕒 Horas Activas",
+        "btn_language": "🌐 Idioma / Language",
         "quarantine_list_ui": "📋 *Lista de Cuarentena*\n\nContenedores actualmente en espera:\n\n{list}",
         "quarantine_list_empty": "No hay contenedores en cuarentena actualmente.",
         "quarantine_list_item": "• *{name}*: {days} día(s) restante(s)",
-        "btn_active_hours": "🕒 Horas Activas",
         "active_hours_ui": "🕒 *Horas Activas*\n\nDurante las horas activas se pausan las actualizaciones automáticas y reinicios para no interrumpir servicios en uso (ej. viendo Plex).\n\n• Estado: *{state}*\n• Horas activas: *{start} - {end}*\n• Ventana de actualización: *{end} - {start}*\n• Hora actual: *{time}* ({status})\n\nSelecciona un ajuste rápido o activa/desactiva:",
         "active_hours_status_active": "⏸️ En Horas Activas (Pausadas)",
         "active_hours_status_inactive": "▶️ Fuera de Horas Activas (Permitidas)",
@@ -97,8 +109,18 @@ STRINGS = {
         "active_hours_preset_0901": "💤 09:00 - 01:00",
         "active_hours_preset_0823": "☀️ 08:00 - 23:00",
         "active_hours_preset_0918": "🏢 09:00 - 18:00",
-        "active_hours_cmd_help": "🕒 *Configuración de Horas Activas*\n\nUso:\n`/activehours on` - Activar horas activas\n`/activehours off` - Desactivar horas activas\n`/activehours 08:00 02:00` - Definir horas activas de 08:00 a 02:00\n\nEstado actual: *{state}* ({start} - {end})",
+        "active_hours_cmd_help": "🕒 *Configuración de Horas Activas*\n\nUso:\n`/activehours on` o `/horasactivas on` - Activar horas activas\n`/activehours off` o `/horasactivas off` - Desactivar horas activas\n`/activehours 08:00 02:00` - Definir horas activas de 08:00 a 02:00\n\nEstado actual: *{state}* ({start} - {end})",
         "active_hours_updated": "🕒 Horas activas configuradas: *{start} - {end}* ({state}). Las actualizaciones se aplicarán entre *{end} - {start}*.",
+        "language_ui": "🌐 *Idioma / Language*\n\nSelecciona tu idioma preferido para las notificaciones y comandos de Telegram:\n\nActualmente configurado en: *{lang}*",
+        "lang_en": "Inglés (English)",
+        "lang_es": "Español (Spanish)",
+        "lang_changed": "🌐 Idioma cambiado a *Español*.",
+        "language_cmd_help": "🌐 *Selección de Idioma*\n\nUso:\n`/idioma es` o `/language es` - Español\n`/idioma en` o `/language en` - English\n\nIdioma actual: *{lang}*",
+        "spammy_update_warning": "⚠️ *¡CUIDADO!* Actualizaciones repetitivas detectadas para *{container}*.\nLos metadatos indican que es la misma versión o son compilaciones nocturnas automáticas.\n\n¿Deseas silenciar este contenedor por 30 días para evitar avisos innecesarios?",
+        "snooze_btn": "🔕 Silenciar 30d",
+        "snoozed_msg": "🔕 Contenedor *{container}* silenciado por 30 días.",
+        "version_label": "Versión",
+        "source_label": "Ver código/changelog",
         "interval_ui": "⏱ *Intervalo de Comprobación*\n\nActualmente comprobando cada *{days} día(s)*.\n\nSelecciona el nuevo intervalo:",
         "delay_ui": "⏳ *Retraso de Peticiones*\n\nActualmente esperando *{delay}s* entre contenedores.\n\nSelecciona el nuevo retraso:",
         "cleanup_ui": "🧹 *Limpiar Imagen Antigua*\n\nEstado actual: *{state}*.\n\nSi está activado, borraré la imagen antigua tras actualizar con éxito.",
@@ -154,6 +176,8 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("config", self.settings_command))
         self.application.add_handler(CommandHandler("activehours", self.active_hours_command))
         self.application.add_handler(CommandHandler("horasactivas", self.active_hours_command))
+        self.application.add_handler(CommandHandler("language", self.language_command))
+        self.application.add_handler(CommandHandler("idioma", self.language_command))
         self.application.add_handler(CallbackQueryHandler(self.button_handler))
         self.application.add_error_handler(self._error_handler)
 
@@ -195,10 +219,11 @@ class TelegramBot:
         return str(result)
 
     def _update_language(self, update: Update):
-        if update.effective_user and update.effective_user.language_code:
-            lang_code = update.effective_user.language_code.lower()
-            lang = "es" if lang_code.startswith("es") else "en"
-            self.config_db.set_language(lang)
+        if not self.config_db.get_config("language"):
+            if update.effective_user and update.effective_user.language_code:
+                lang_code = update.effective_user.language_code.lower()
+                lang = "es" if lang_code.startswith("es") else "en"
+                self.config_db.set_language(lang)
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         self._update_language(update)
@@ -248,6 +273,11 @@ class TelegramBot:
             [
                 InlineKeyboardButton(
                     self.t("btn_active_hours"), callback_data="menu_set_active_hours"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    self.t("btn_language"), callback_data="menu_set_language"
                 )
             ],
         ]
@@ -300,6 +330,29 @@ class TelegramBot:
                 InlineKeyboardButton(
                     f"{'✅ ' if (start == '09:00' and end == '18:00' and enabled) else ''}{self.t('active_hours_preset_0918')}",
                     callback_data="set_active_hours_p_0900_1800",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    self.t("btn_back"), callback_data="menu_main_settings"
+                )
+            ],
+        ]
+        return msg, InlineKeyboardMarkup(keyboard)
+
+    def _get_language_ui(self):
+        current = self.config_db.get_language()
+        lang_label = "Español" if current == "es" else "English"
+        msg = self.t("language_ui", lang=lang_label)
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    f"{'✅ ' if current == 'en' else ''}{self.t('lang_en')}",
+                    callback_data="set_lang_en",
+                ),
+                InlineKeyboardButton(
+                    f"{'✅ ' if current == 'es' else ''}{self.t('lang_es')}",
+                    callback_data="set_lang_es",
                 ),
             ],
             [
@@ -560,6 +613,34 @@ class TelegramBot:
         if update.message:
             await update.message.reply_text(reply_msg, parse_mode="Markdown")
 
+    async def language_command(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        args = context.args or []
+        current = self.config_db.get_language()
+        lang_label = "Español" if current == "es" else "English"
+
+        if not args:
+            msg, markup = self._get_language_ui()
+            if update.message:
+                await update.message.reply_text(
+                    text=msg, reply_markup=markup, parse_mode="Markdown"
+                )
+            return
+
+        arg0 = args[0].lower()
+        if arg0 in ("en", "english", "ingles", "inglés"):
+            self.config_db.set_language("en")
+            msg = self.t("lang_changed")
+        elif arg0 in ("es", "spanish", "espanol", "español"):
+            self.config_db.set_language("es")
+            msg = self.t("lang_changed")
+        else:
+            msg = self.t("language_cmd_help", lang=lang_label)
+
+        if update.message:
+            await update.message.reply_text(text=msg, parse_mode="Markdown")
+
     async def send_update_notification(
         self, container_name, new_image, is_stopped=False, remote_info=None, is_same_version=False, reset_count=0
     ):
@@ -569,12 +650,7 @@ class TelegramBot:
         
         if is_same_version or reset_count >= 2:
             # Spammy update detected
-            msg = (f"⚠️ *¡CUIDADO!* Actualizaciones repetitivas detectadas para *{container_name}*.\n"
-                   f"Los metadatos indican que es la misma versión o son compilaciones nocturnas automáticas.\n\n"
-                   f"¿Deseas silenciar este contenedor por 30 días para evitar avisos innecesarios?") if lang == "es" else \
-                  (f"⚠️ *WARNING!* Repetitive updates detected for *{container_name}*.\n"
-                   f"Metadata indicates this is the same version or automated nightly builds.\n\n"
-                   f"Would you like to mute this container for 30 days?")
+            msg = self.t("spammy_update_warning", container=container_name)
         else:
             msg = self.t(
                 "update_msg", container=container_name, state=state_str, image=new_image
@@ -584,15 +660,9 @@ class TelegramBot:
                 source = remote_info.get("source")
 
                 if version:
-                    msg += (
-                        f"\n📦 Version: `{version}`"
-                        if lang == "en"
-                        else f"\n📦 Versión: `{version}`"
-                    )
+                    msg += f"\n📦 {self.t('version_label')}: `{version}`"
                 if source:
-                    link_text = (
-                        "Changelog / Source" if lang == "en" else "Ver código/changelog"
-                    )
+                    link_text = self.t("source_label")
                     msg += f"\n🔗 [{link_text}]({source})"
 
         keyboard = [
@@ -612,7 +682,7 @@ class TelegramBot:
         ]
         
         if is_same_version or reset_count >= 2:
-            snooze_text = "🔕 Silenciar 30d" if lang == "es" else "🔕 Snooze 30d"
+            snooze_text = self.t("snooze_btn")
             # prepend snooze button
             keyboard.insert(0, [InlineKeyboardButton(snooze_text, callback_data=f"snooze_{container_name}")])
             
@@ -689,6 +759,12 @@ class TelegramBot:
                 text=msg, reply_markup=markup, parse_mode="Markdown"
             )
             return
+        elif data == "menu_set_language":
+            msg, markup = self._get_language_ui()
+            await query.edit_message_text(
+                text=msg, reply_markup=markup, parse_mode="Markdown"
+            )
+            return
 
         # Setting values
         if data.startswith("set_interval_"):
@@ -757,6 +833,15 @@ class TelegramBot:
             )
             return
 
+        if data in ("set_lang_en", "set_lang_es"):
+            new_lang = "en" if data == "set_lang_en" else "es"
+            self.config_db.set_language(new_lang)
+            msg, markup = self._get_language_ui()
+            await query.edit_message_text(
+                text=msg, reply_markup=markup, parse_mode="Markdown"
+            )
+            return
+
         # Update Container Handlers
         try:
             action, container_name = data.split("_", 1)
@@ -788,7 +873,7 @@ class TelegramBot:
         if action == "snooze":
             self.config_db.set_snooze(container_name, 30)
             self.config_db.delete_quarantine_record(container_name)
-            msg = f"🔕 Contenedor *{container_name}* silenciado por 30 días." if self.config_db.get_language() == "es" else f"🔕 Container *{container_name}* snoozed for 30 days."
+            msg = self.t("snoozed_msg", container=container_name)
             await query.edit_message_text(text=msg, parse_mode="Markdown")
             return
 

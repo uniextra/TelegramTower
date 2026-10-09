@@ -49,3 +49,54 @@ def test_dashboard_save_active_hours(monkeypatch):
         mock_config.set_active_hours_start.assert_called_with("09:00")
         mock_config.set_active_hours_end.assert_called_with("01:00")
 
+
+def test_dashboard_set_language_form():
+    from unittest.mock import MagicMock
+    from web_server import app
+
+    mock_docker = MagicMock()
+    mock_docker.get_containers.return_value = []
+    mock_config = MagicMock()
+
+    app.config["DOCKER_MANAGER"] = mock_docker
+    app.config["CONFIG_DB"] = mock_config
+
+    client = app.test_client()
+    with patch.dict(os.environ, {}, clear=True):
+        resp = client.post(
+            "/",
+            data={
+                "action": "set_language",
+                "language": "es",
+            },
+        )
+        assert resp.status_code == 302
+        mock_config.set_language.assert_called_with("es")
+
+
+def test_dashboard_set_language_ajax():
+    from unittest.mock import MagicMock
+    from web_server import app
+
+    mock_docker = MagicMock()
+    mock_docker.get_containers.return_value = []
+    mock_config = MagicMock()
+
+    app.config["DOCKER_MANAGER"] = mock_docker
+    app.config["CONFIG_DB"] = mock_config
+
+    client = app.test_client()
+    with patch.dict(os.environ, {}, clear=True):
+        resp = client.post(
+            "/",
+            data={
+                "action": "set_language",
+                "language": "en",
+            },
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        assert resp.status_code == 200
+        assert resp.get_json() == {"status": "ok", "language": "en"}
+        mock_config.set_language.assert_called_with("en")
+
+

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ settings.language or 'en' }}" data-server-lang="{{ settings.language or 'en' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TelegramTower Dashboard</title>
+    <title data-i18n="appTitle">TelegramTower Dashboard</title>
     <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='logo.jpg') }}">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -32,20 +32,25 @@
             </div>
             <div class="flex items-center gap-2">
                 {% if settings.active_hours_enabled %}
-                <div class="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700 shadow-sm" title="Active Hours: {{ settings.active_hours_start }} - {{ settings.active_hours_end }}">
-                    🕒 Horas Activas: {{ settings.active_hours_start }} - {{ settings.active_hours_end }}
+                <div class="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700 shadow-sm" data-i18n-title="activeHoursHelp" title="Active Hours: {{ settings.active_hours_start }} - {{ settings.active_hours_end }}">
+                    <span>🕒</span> <span data-i18n="activeHoursHeader">Horas Activas:</span> {{ settings.active_hours_start }} - {{ settings.active_hours_end }}
                     {% if settings.is_in_active_hours %}
                     <span class="inline-block w-2 h-2 rounded-full bg-amber-500" title="Updates Paused"></span>
-                    <span class="text-[11px] text-amber-700 font-semibold">Pausadas</span>
+                    <span class="text-[11px] text-amber-700 font-semibold" data-i18n="statusPaused">Pausadas</span>
                     {% else %}
                     <span class="inline-block w-2 h-2 rounded-full bg-emerald-500" title="Updates Allowed"></span>
-                    <span class="text-[11px] text-emerald-700 font-semibold">Permitidas</span>
+                    <span class="text-[11px] text-emerald-700 font-semibold" data-i18n="statusAllowed">Permitidas</span>
                     {% endif %}
                 </div>
                 {% endif %}
                 <div class="inline-flex items-center rounded-full border border-zinc-200 bg-white px-3 py-1 text-sm font-medium text-zinc-900 shadow-sm transition-colors hover:bg-zinc-50">
-                    {{ containers|length }} Containers
+                    <span id="containers-count">{{ containers|length }}</span>&nbsp;<span data-i18n="containersCount">Containers</span>
                 </div>
+                <!-- Language Toggle Button (Movistar pattern) -->
+                <button onclick="toggleLanguage()" id="lang-btn" class="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-100 cursor-pointer" title="Cambiar idioma / Change language">
+                    <span>🌐</span>
+                    <span id="lang-btn-text">ES</span>
+                </button>
             </div>
         </header>
 
@@ -53,8 +58,8 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="rounded-xl border border-zinc-200 bg-white shadow-sm text-zinc-950 flex flex-col">
                 <div class="flex flex-col space-y-1.5 p-6 pb-4">
-                    <h3 class="font-semibold leading-none tracking-tight text-lg">Bot Configuration</h3>
-                    <p class="text-sm text-zinc-500">Update your Telegram credentials. Settings saved here override environment variables.</p>
+                    <h3 class="font-semibold leading-none tracking-tight text-lg" data-i18n="botConfigTitle">Bot Configuration</h3>
+                    <p class="text-sm text-zinc-500" data-i18n="botConfigDesc">Update your Telegram credentials. Settings saved here override environment variables.</p>
                 </div>
                 <div class="p-6 pt-0 flex-1 flex flex-col justify-between">
                     <form method="POST" action="/" class="flex flex-col space-y-3">
@@ -62,38 +67,38 @@
                         <div class="relative w-full">
                             {% if env_token and db_token and env_token != db_token %}
                             <div class="absolute right-3 top-1/2 -translate-y-1/2 group cursor-help z-10 flex items-center">
-                                <span class="text-amber-500 text-sm drop-shadow-sm" title="Conflict Detected: El token usado es el de la web. Se recomienda usar solo uno (web o variable de entorno) para evitar conflictos.">⚠️</span>
+                                <span class="text-amber-500 text-sm drop-shadow-sm" data-i18n-title="conflictToken" title="Conflict Detected: El token usado es el de la web. Se recomienda usar solo uno (web o variable de entorno) para evitar conflictos.">⚠️</span>
                             </div>
                             {% endif %}
-                            <input type="text" name="bot_token" id="bot_token" value="{{ db_token or env_token }}" placeholder="Enter Telegram Bot Token..." 
+                            <input type="text" name="bot_token" id="bot_token" value="{{ db_token or env_token }}" data-i18n-ph="placeholderBotToken" placeholder="Enter Telegram Bot Token..." 
                                    class="flex h-10 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
                         </div>
                         
                         <div class="relative w-full mt-2">
                             {% if env_chat_id and db_chat_id and env_chat_id != db_chat_id %}
                             <div class="absolute right-3 top-1/2 -translate-y-1/2 group cursor-help z-10 flex items-center">
-                                <span class="text-amber-500 text-sm drop-shadow-sm" title="Conflict Detected: El Chat ID usado es el de la web. Se recomienda usar solo uno para evitar conflictos.">⚠️</span>
+                                <span class="text-amber-500 text-sm drop-shadow-sm" data-i18n-title="conflictChatId" title="Conflict Detected: El Chat ID usado es el de la web. Se recomienda usar solo uno para evitar conflictos.">⚠️</span>
                             </div>
                             {% endif %}
-                            <input type="text" name="chat_id" id="chat_id" value="{{ db_chat_id or env_chat_id }}" placeholder="Enter Telegram Chat ID..." 
+                            <input type="text" name="chat_id" id="chat_id" value="{{ db_chat_id or env_chat_id }}" data-i18n-ph="placeholderChatId" placeholder="Enter Telegram Chat ID..." 
                                    class="flex h-10 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
                         </div>
                         
-                        <button type="submit" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 h-10 px-6 py-2 shadow-sm w-full mt-2">
+                        <button type="submit" data-i18n="saveCredentialsBtn" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 h-10 px-6 py-2 shadow-sm w-full mt-2">
                             Save Credentials
                         </button>
                     </form>
                     <p class="text-[13px] text-zinc-500 mt-4 flex items-center gap-1.5">
                         <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        Restart container to apply changes.
+                        <span data-i18n="restartContainerNotice">Restart container to apply changes.</span>
                     </p>
                 </div>
             </div>
 
             <div class="rounded-xl border border-zinc-200 bg-white shadow-sm text-zinc-950 flex flex-col">
                 <div class="flex flex-col space-y-1.5 p-6 pb-4">
-                    <h3 class="font-semibold leading-none tracking-tight text-lg">Global Settings</h3>
-                    <p class="text-sm text-zinc-500">Configure global update checking and cleanup preferences.</p>
+                    <h3 class="font-semibold leading-none tracking-tight text-lg" data-i18n="globalSettingsTitle">Global Settings</h3>
+                    <p class="text-sm text-zinc-500" data-i18n="globalSettingsDesc">Configure global update checking and cleanup preferences.</p>
                 </div>
                 <div class="p-6 pt-0">
                     <form method="POST" action="/" class="space-y-4">
@@ -101,20 +106,20 @@
                         
                         <div class="grid grid-cols-2 gap-4">
                             <div class="space-y-1">
-                                <label class="text-xs font-medium text-zinc-700 flex items-center">
-                                    Check Interval (Days)
-                                    <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>How often to check for image updates on Docker Hub.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <label class="text-xs font-medium text-zinc-700 flex items-center" data-i18n-title="checkIntervalHelp" title="How often to check for image updates on Docker Hub.">
+                                    <span data-i18n="checkIntervalLabel">Check Interval (Days)</span>
+                                    <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title data-i18n="checkIntervalHelp">How often to check for image updates on Docker Hub.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 </label>
                                 <select name="poll_interval_days" class="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
-                                    <option value="1" {% if settings.poll_interval_days == 1 %}selected{% endif %}>1 Day</option>
-                                    <option value="7" {% if settings.poll_interval_days == 7 %}selected{% endif %}>7 Days</option>
-                                    <option value="30" {% if settings.poll_interval_days == 30 %}selected{% endif %}>30 Days</option>
+                                    <option value="1" data-i18n="opt1Day" {% if settings.poll_interval_days == 1 %}selected{% endif %}>1 Day</option>
+                                    <option value="7" data-i18n="opt7Days" {% if settings.poll_interval_days == 7 %}selected{% endif %}>7 Days</option>
+                                    <option value="30" data-i18n="opt30Days" {% if settings.poll_interval_days == 30 %}selected{% endif %}>30 Days</option>
                                 </select>
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-medium text-zinc-700 flex items-center" title="Delay between requests to Docker Hub to prevent rate limiting.">
-                                    Request Delay (Secs)
-                                    <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Delay between requests to Docker Hub to prevent rate limiting.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <label class="text-xs font-medium text-zinc-700 flex items-center" data-i18n-title="requestDelayHelp" title="Delay between requests to Docker Hub to prevent rate limiting.">
+                                    <span data-i18n="requestDelayLabel">Request Delay (Secs)</span>
+                                    <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title data-i18n="requestDelayHelp">Delay between requests to Docker Hub to prevent rate limiting.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 </label>
                                 <select name="request_delay_seconds" class="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
                                     <option value="0" {% if settings.request_delay_seconds == 0 %}selected{% endif %}>0s</option>
@@ -123,28 +128,28 @@
                                 </select>
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-medium text-zinc-700 flex items-center" title="Wait this many days before notifying about a new image update. Helps avoid unstable releases.">
-                                    Quarantine Delay (Days)
-                                    <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Wait this many days before notifying about a new image update. Helps avoid unstable releases.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <label class="text-xs font-medium text-zinc-700 flex items-center" data-i18n-title="quarantineDaysHelp" title="Wait this many days before notifying about a new image update. Helps avoid unstable releases.">
+                                    <span data-i18n="quarantineDelayLabel">Quarantine Delay (Days)</span>
+                                    <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title data-i18n="quarantineDaysHelp">Wait this many days before notifying about a new image update. Helps avoid unstable releases.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 </label>
                                 <select name="quarantine_days" class="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
-                                    <option value="0" {% if settings.quarantine_days == 0 %}selected{% endif %}>None (0)</option>
-                                    <option value="1" {% if settings.quarantine_days == 1 %}selected{% endif %}>1 Day</option>
-                                    <option value="3" {% if settings.quarantine_days == 3 %}selected{% endif %}>3 Days</option>
-                                    <option value="5" {% if settings.quarantine_days == 5 %}selected{% endif %}>5 Days</option>
-                                    <option value="7" {% if settings.quarantine_days == 7 %}selected{% endif %}>7 Days</option>
+                                    <option value="0" data-i18n="optNone0" {% if settings.quarantine_days == 0 %}selected{% endif %}>None (0)</option>
+                                    <option value="1" data-i18n="opt1Day" {% if settings.quarantine_days == 1 %}selected{% endif %}>1 Day</option>
+                                    <option value="3" data-i18n="opt3Days" {% if settings.quarantine_days == 3 %}selected{% endif %}>3 Days</option>
+                                    <option value="5" data-i18n="opt5Days" {% if settings.quarantine_days == 5 %}selected{% endif %}>5 Days</option>
+                                    <option value="7" data-i18n="opt7Days" {% if settings.quarantine_days == 7 %}selected{% endif %}>7 Days</option>
                                 </select>
                             </div>
                         </div>
 
                         <div class="flex flex-wrap items-center gap-x-6 gap-y-3 pt-2">
-                            <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" title="Automatically remove the old Docker image after a container is successfully updated.">
+                            <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" data-i18n-title="cleanupHelp" title="Automatically remove the old Docker image after a container is successfully updated.">
                                 <input type="checkbox" name="cleanup_old_image" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.cleanup_old_image %}checked{% endif %}>
-                                <span class="flex items-center">Cleanup Old Images <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Automatically remove the old Docker image after a container is successfully updated.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
+                                <span class="flex items-center"><span data-i18n="cleanupOldImagesLabel">Cleanup Old Images</span> <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title data-i18n="cleanupHelp">Automatically remove the old Docker image after a container is successfully updated.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
                             </label>
-                            <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" title="Also check for updates for containers that are currently stopped.">
+                            <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" data-i18n-title="checkStoppedHelp" title="Also check for updates for containers that are currently stopped.">
                                 <input type="checkbox" name="include_stopped" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.include_stopped %}checked{% endif %}>
-                                <span class="flex items-center">Check Stopped <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Also check for updates for containers that are currently stopped.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
+                                <span class="flex items-center"><span data-i18n="checkStoppedLabel">Check Stopped</span> <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title data-i18n="checkStoppedHelp">Also check for updates for containers that are currently stopped.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
                             </label>
                         </div>
                         
@@ -152,31 +157,34 @@
                         <div class="mt-4 pt-4 border-t border-zinc-100">
                             <div class="flex items-center justify-between mb-3">
                                 <div>
-                                    <h4 class="text-sm font-medium text-zinc-900 flex items-center" title="Enable real-time Telegram notifications for container lifecycle events.">Live Event Notifications <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Enable real-time Telegram notifications for container lifecycle events.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></h4>
-                                    <p class="text-xs text-zinc-500">Monitor real-time Docker events via Telegram</p>
+                                    <h4 class="text-sm font-medium text-zinc-900 flex items-center" data-i18n-title="liveEventsHelp" title="Enable real-time Telegram notifications for container lifecycle events.">
+                                        <span data-i18n="liveEventsTitle">Live Event Notifications</span>
+                                        <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title data-i18n="liveEventsHelp">Enable real-time Telegram notifications for container lifecycle events.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    </h4>
+                                    <p class="text-xs text-zinc-500" data-i18n="liveEventsDesc">Monitor real-time Docker events via Telegram</p>
                                 </div>
-                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" title="Send a message when a container starts.">
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" data-i18n-title="enableEventsHelp" title="Send Telegram messages when container lifecycle events happen.">
                                     <input type="checkbox" name="events_enabled" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_enabled %}checked{% endif %}>
-                                    <span>Enable Events</span>
+                                    <span data-i18n="enableEventsLabel">Enable Events</span>
                                 </label>
                             </div>
                             
                             <div class="grid grid-cols-2 gap-3 pl-2 opacity-90">
-                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" data-i18n-title="notifyStartHelp" title="Send a message when a container starts.">
                                     <input type="checkbox" name="events_notify_start" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_notify_start %}checked{% endif %}>
-                                    <span class="flex items-center">Notify on Start <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Send a message when a container starts.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
+                                    <span class="flex items-center"><span data-i18n="notifyStartLabel">Notify on Start</span> <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title data-i18n="notifyStartHelp">Send a message when a container starts.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
                                 </label>
-                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" title="Send a message when a container stops or crashes.">
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" data-i18n-title="notifyStopHelp" title="Send a message when a container stops or crashes.">
                                     <input type="checkbox" name="events_notify_stop" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_notify_stop %}checked{% endif %}>
-                                    <span class="flex items-center">Notify on Crash/Stop <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Send a message when a container stops or crashes.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
+                                    <span class="flex items-center"><span data-i18n="notifyStopLabel">Notify on Crash/Stop</span> <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title data-i18n="notifyStopHelp">Send a message when a container stops or crashes.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
                                 </label>
-                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" title="Send a message when a container healthcheck fails or recovers.">
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium" data-i18n-title="notifyHealthHelp" title="Send a message when a container healthcheck fails or recovers.">
                                     <input type="checkbox" name="events_notify_health" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_notify_health %}checked{% endif %}>
-                                    <span class="flex items-center">Notify Health Changes <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Send a message when a container healthcheck fails or recovers.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
+                                    <span class="flex items-center"><span data-i18n="notifyHealthLabel">Notify Health Changes</span> <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title data-i18n="notifyHealthHelp">Send a message when a container healthcheck fails or recovers.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
                                 </label>
-                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium {% if settings.env_only_whitelist %}text-zinc-400{% else %}text-indigo-700{% endif %}" title="Only monitor containers labeled with telegram-notifier.monitor=true" title="Only monitor events for containers with the telegram-notifier.monitor=true label.">
+                                <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium {% if settings.env_only_whitelist %}text-zinc-400{% else %}text-indigo-700{% endif %}" data-i18n-title="whitelistOnlyHelp" title="Only monitor events for containers with the telegram-notifier.monitor=true label.">
                                     <input type="checkbox" name="events_whitelist_only" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.events_whitelist_only %}checked{% endif %} {% if settings.env_only_whitelist %}disabled{% endif %}>
-                                    <span class="flex items-center">Whitelist Only <svg class="w-3.5 h-3.5 text-indigo-400 hover:text-indigo-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title>Only monitor events for containers with the telegram-notifier.monitor=true label.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
+                                    <span class="flex items-center"><span data-i18n="whitelistOnlyLabel">Whitelist Only</span> <svg class="w-3.5 h-3.5 text-indigo-400 hover:text-indigo-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" ><title data-i18n="whitelistOnlyHelp">Only monitor events for containers with the telegram-notifier.monitor=true label.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>
                                     {% if settings.env_only_whitelist %}
                                     <span class="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800" title="Forced by ONLY_WHITELIST environment variable">ENV OVERRIDE</span>
                                     <!-- Send hidden value so it doesn't get cleared by disabled state if the form saves -->
@@ -190,46 +198,46 @@
                         <div class="mt-4 pt-4 border-t border-zinc-100">
                             <div class="flex items-center justify-between mb-3">
                                 <div>
-                                    <h4 class="text-sm font-medium text-zinc-900 flex items-center" title="Define hours when services are actively in use (like Windows Update Active Hours). Automatic updates and restarts will be paused during this period.">
-                                        🕒 Horas Activas (Active Hours)
-                                        <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><title>Pause automatic container updates/restarts during active use (e.g. while watching Plex).</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <h4 class="text-sm font-medium text-zinc-900 flex items-center" data-i18n-title="activeHoursHelp" title="Pause automatic container updates/restarts during active use (e.g. while watching Plex).">
+                                        <span>🕒 </span><span data-i18n="activeHoursTitle">Horas Activas (Active Hours)</span>
+                                        <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><title data-i18n="activeHoursHelp">Pause automatic container updates/restarts during active use (e.g. while watching Plex).</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     </h4>
-                                    <p class="text-xs text-zinc-500">Pausar actualizaciones automáticas durante horas de uso (ej. Plex)</p>
+                                    <p class="text-xs text-zinc-500" data-i18n="activeHoursDesc">Pausar actualizaciones automáticas durante horas de uso (ej. Plex)</p>
                                 </div>
                                 <label class="flex items-center space-x-2 cursor-pointer text-sm font-medium">
                                     <input type="checkbox" name="active_hours_enabled" class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950 w-4 h-4" {% if settings.active_hours_enabled %}checked{% endif %}>
-                                    <span>Activar</span>
+                                    <span data-i18n="activateLabel">Activar</span>
                                 </label>
                             </div>
 
                             <div class="grid grid-cols-2 gap-4">
                                 <div class="space-y-1">
-                                    <label class="text-xs font-medium text-zinc-700 flex items-center">
-                                        Inicio (Pausar)
-                                        <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><title>Hora a partir de la cual no se aplicarán actualizaciones automáticas.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <label class="text-xs font-medium text-zinc-700 flex items-center" data-i18n-title="activeStartHelp" title="Time after which automatic updates will not be applied.">
+                                        <span data-i18n="activeStartLabel">Inicio (Pausar)</span>
+                                        <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><title data-i18n="activeStartHelp">Hora a partir de la cual no se aplicarán actualizaciones automáticas.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     </label>
                                     <input type="time" name="active_hours_start" value="{{ settings.active_hours_start }}" class="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
                                 </div>
                                 <div class="space-y-1">
-                                    <label class="text-xs font-medium text-zinc-700 flex items-center">
-                                        Fin (Reanudar)
-                                        <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><title>Hora a partir de la cual finalizan las horas activas y se permiten actualizaciones automáticas.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <label class="text-xs font-medium text-zinc-700 flex items-center" data-i18n-title="activeEndHelp" title="Time when active hours end and automatic updates are allowed again.">
+                                        <span data-i18n="activeEndLabel">Fin (Reanudar)</span>
+                                        <svg class="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 ml-1 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><title data-i18n="activeEndHelp">Hora a partir de la cual finalizan las horas activas y se permiten actualizaciones automáticas.</title><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     </label>
                                     <input type="time" name="active_hours_end" value="{{ settings.active_hours_end }}" class="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
                                 </div>
                             </div>
 
                             <div class="mt-2 text-xs text-zinc-500 flex items-center justify-between">
-                                <span>Ventana de actualización: <strong>{{ settings.active_hours_end }}</strong> a <strong>{{ settings.active_hours_start }}</strong></span>
+                                <span><span data-i18n="updateWindowLabel">Ventana de actualización:</span> <strong>{{ settings.active_hours_end }}</strong> <span data-i18n="toWord">a</span> <strong>{{ settings.active_hours_start }}</strong></span>
                                 <span class="inline-flex items-center gap-1.5">
                                     {% if settings.active_hours_enabled %}
                                         {% if settings.is_in_active_hours %}
-                                            <span class="inline-block w-2 h-2 rounded-full bg-amber-500"></span> <span class="text-amber-700 font-medium">Pausadas ahora</span>
+                                            <span class="inline-block w-2 h-2 rounded-full bg-amber-500"></span> <span class="text-amber-700 font-medium" data-i18n="pausedNowStatus">Pausadas ahora</span>
                                         {% else %}
-                                            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span> <span class="text-emerald-700 font-medium">Ventana abierta</span>
+                                            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span> <span class="text-emerald-700 font-medium" data-i18n="windowOpenStatus">Ventana abierta</span>
                                         {% endif %}
                                     {% else %}
-                                        <span class="inline-block w-2 h-2 rounded-full bg-zinc-300"></span> Desactivado
+                                        <span class="inline-block w-2 h-2 rounded-full bg-zinc-300"></span> <span data-i18n="disabledStatus">Desactivado</span>
                                     {% endif %}
                                     <span class="text-zinc-400">({{ settings.server_time }})</span>
                                 </span>
@@ -237,7 +245,7 @@
                         </div>
                         
                         <div class="pt-2">
-                            <button type="submit" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 h-9 px-4 py-2 shadow-sm w-full">
+                            <button type="submit" data-i18n="saveGlobalSettingsBtn" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 h-9 px-4 py-2 shadow-sm w-full">
                                 Save Global Settings
                             </button>
                         </div>
@@ -252,12 +260,12 @@
                 <table id="containers-table" class="w-full text-sm text-left">
                     <thead class="bg-zinc-50/80 border-b border-zinc-200 text-zinc-500">
                         <tr>
-                            <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(0)">Container <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
-                            <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(1)">Image <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
-                            <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(2)">Status <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
-                            <th class="h-11 px-6 align-middle font-medium text-center cursor-pointer select-none group" onclick="sortTable(3)">Auto-Update <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
-                            <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(4)">Quarantine Status <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
-                            <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(5)">Last Updated <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
+                            <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(0)"><span data-i18n="thContainer">Container</span> <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
+                            <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(1)"><span data-i18n="thImage">Image</span> <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
+                            <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(2)"><span data-i18n="thStatus">Status</span> <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
+                            <th class="h-11 px-6 align-middle font-medium text-center cursor-pointer select-none group" onclick="sortTable(3)"><span data-i18n="thAutoUpdate">Auto-Update</span> <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
+                            <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(4)"><span data-i18n="thQuarantineStatus">Quarantine Status</span> <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
+                            <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(5)"><span data-i18n="thLastUpdated">Last Updated</span> <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-200 text-zinc-700">
@@ -276,12 +284,12 @@
                                 {% if c.status == 'running' %}
                                     <div class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 shadow-sm">
                                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
-                                        Running
+                                        <span data-i18n="badgeRunning">Running</span>
                                     </div>
                                 {% elif c.status == 'exited' %}
                                     <div class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 shadow-sm">
                                         <span class="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5"></span>
-                                        Exited
+                                        <span data-i18n="badgeExited">Exited</span>
                                     </div>
                                 {% else %}
                                     <div class="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-xs font-semibold text-zinc-700 shadow-sm">
@@ -295,11 +303,11 @@
                                     <input type="hidden" name="container_name" value="{{ c.name }}">
                                     <button type="submit" class="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 rounded-md transition-transform active:scale-95">
                                         {% if c.auto_update %}
-                                            <span class="inline-flex items-center justify-center bg-zinc-100 border border-zinc-200 rounded-md w-7 h-7 text-zinc-900 shadow-sm hover:bg-zinc-200 transition-colors" title="Auto-Update Enabled (Click to Disable)">
+                                            <span class="inline-flex items-center justify-center bg-zinc-100 border border-zinc-200 rounded-md w-7 h-7 text-zinc-900 shadow-sm hover:bg-zinc-200 transition-colors" data-i18n-title="autoUpdateEnabledTitle" title="Auto-Update Enabled (Click to Disable)">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                                             </span>
                                         {% else %}
-                                            <span class="inline-flex items-center justify-center bg-white border border-dashed border-zinc-300 rounded-md w-7 h-7 text-zinc-300 hover:text-zinc-500 hover:border-zinc-400 hover:bg-zinc-50 transition-colors" title="Auto-Update Disabled (Click to Enable)">
+                                            <span class="inline-flex items-center justify-center bg-white border border-dashed border-zinc-300 rounded-md w-7 h-7 text-zinc-300 hover:text-zinc-500 hover:border-zinc-400 hover:bg-zinc-50 transition-colors" data-i18n-title="autoUpdateDisabledTitle" title="Auto-Update Disabled (Click to Enable)">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                                             </span>
                                         {% endif %}
@@ -309,13 +317,13 @@
                             <td class="px-6 py-4 align-middle" data-sort="{{ c.quarantine.remaining if c.quarantine else (-1 if c.snoozed else 0) }}">
                                 {% if c.snoozed %}
                                     <div class="flex items-center gap-2">
-                                        <div class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 shadow-sm" title="Muted for 30 days">
-                                            🔕 Snoozed
+                                        <div class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 shadow-sm" data-i18n-title="snoozedTitle" title="Muted for 30 days">
+                                            <span data-i18n="badgeSnoozed">🔕 Snoozed</span>
                                         </div>
                                         <form method="POST" action="/" class="inline-block m-0 p-0">
                                             <input type="hidden" name="action" value="clear_snooze">
                                             <input type="hidden" name="container_name" value="{{ c.name }}">
-                                            <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-800 underline decoration-indigo-300 hover:decoration-indigo-800 transition-colors">
+                                            <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-800 underline decoration-indigo-300 hover:decoration-indigo-800 transition-colors" data-i18n="btnUnsnooze">
                                                 Un-snooze
                                             </button>
                                         </form>
@@ -323,23 +331,27 @@
                                 {% elif c.quarantine %}
                                     <div class="flex items-center gap-2">
                                         <div class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 shadow-sm">
-                                            {{ c.quarantine.remaining }} days left
+                                            <span>{{ c.quarantine.remaining }}</span>&nbsp;<span data-i18n="daysLeft">days left</span>
                                         </div>
                                         {% if c.quarantine.has_warning %}
                                         <div class="group relative cursor-help inline-flex items-center justify-center">
                                             <span class="text-rose-500 text-lg drop-shadow-sm">⚠️</span>
-                                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden w-48 rounded-md border border-zinc-200 bg-white p-2 text-xs text-zinc-700 shadow-lg group-hover:block transition-all z-10 text-center">
+                                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden w-48 rounded-md border border-zinc-200 bg-white p-2 text-xs text-zinc-700 shadow-lg group-hover:block transition-all z-10 text-center" data-i18n="fastUpdateNotice">
                                                 Fast update detected during quarantine!
                                             </div>
                                         </div>
                                         {% endif %}
                                     </div>
                                 {% else %}
-                                    <span class="text-zinc-400 text-sm">Not in quarantine</span>
+                                    <span class="text-zinc-400 text-sm" data-i18n="notInQuarantine">Not in quarantine</span>
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4 align-middle text-zinc-500 text-sm" data-sort="{{ c.last_updated }}">
-                                {{ c.last_updated }}
+                                {% if c.last_updated == "Never" %}
+                                    <span data-i18n="neverUpdated">Never</span>
+                                {% else %}
+                                    {{ c.last_updated }}
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -349,11 +361,242 @@
         </div>
         
         <footer class="mt-8 text-center text-zinc-400 text-sm pb-8">
-            <p>Powered by <span class="font-medium text-zinc-500">TelegramTower</span></p>
+            <p><span data-i18n="poweredBy">Powered by</span> <span class="font-medium text-zinc-500">TelegramTower</span></p>
         </footer>
     </div>
 
+    <!-- Frontend Scripting Logic & i18n Dictionary -->
     <script>
+        const translations = {
+            es: {
+                appTitle: "TelegramTower Dashboard",
+                activeHoursHeader: "Horas Activas:",
+                statusPaused: "Pausadas",
+                statusAllowed: "Permitidas",
+                containersCount: "Contenedores",
+                botConfigTitle: "Configuración del Bot",
+                botConfigDesc: "Actualiza tus credenciales de Telegram. Los ajustes guardados aquí tienen prioridad sobre las variables de entorno.",
+                conflictToken: "Conflicto detectado: Se está usando el token de la web. Se recomienda usar solo uno para evitar conflictos.",
+                conflictChatId: "Conflicto detectado: Se está usando el Chat ID de la web. Se recomienda usar solo uno para evitar conflictos.",
+                placeholderBotToken: "Introduce el Token del Bot de Telegram...",
+                placeholderChatId: "Introduce el Chat ID de Telegram...",
+                saveCredentialsBtn: "Guardar Credenciales",
+                restartContainerNotice: "Reinicia el contenedor para aplicar los cambios.",
+                globalSettingsTitle: "Ajustes Globales",
+                globalSettingsDesc: "Configura las preferencias globales de comprobación de actualizaciones y limpieza.",
+                checkIntervalLabel: "Intervalo de comprobación (Días)",
+                checkIntervalHelp: "Cada cuánto tiempo verificar actualizaciones de imágenes en Docker Hub.",
+                opt1Day: "1 Día",
+                opt7Days: "7 Días",
+                opt30Days: "30 Días",
+                requestDelayLabel: "Retraso de peticiones (Segs)",
+                requestDelayHelp: "Pausa entre peticiones a Docker Hub para evitar bloqueos por límite de peticiones.",
+                quarantineDelayLabel: "Periodo de cuarentena (Días)",
+                quarantineDaysHelp: "Espera este número de días antes de notificar una nueva imagen. Ayuda a evitar versiones inestables.",
+                optNone0: "Ninguno (0)",
+                opt3Days: "3 Días",
+                opt5Days: "5 Días",
+                cleanupOldImagesLabel: "Limpiar imágenes antiguas",
+                cleanupHelp: "Eliminar automáticamente la imagen antigua de Docker tras actualizar con éxito un contenedor.",
+                checkStoppedLabel: "Comprobar detenidos",
+                checkStoppedHelp: "Comprobar también actualizaciones para contenedores que están actualmente detenidos.",
+                liveEventsTitle: "Notificaciones de Eventos en Vivo",
+                liveEventsHelp: "Activar notificaciones en tiempo real en Telegram para eventos del ciclo de vida del contenedor.",
+                liveEventsDesc: "Monitoriza eventos de Docker en tiempo real vía Telegram",
+                enableEventsLabel: "Activar Eventos",
+                enableEventsHelp: "Enviar mensajes a Telegram cuando ocurran eventos del ciclo de vida de los contenedores.",
+                notifyStartLabel: "Notificar al Iniciar",
+                notifyStartHelp: "Enviar un mensaje cuando se inicia un contenedor.",
+                notifyStopLabel: "Notificar Parada/Caída",
+                notifyStopHelp: "Enviar un mensaje cuando un contenedor se detiene o falla.",
+                notifyHealthLabel: "Notificar Cambios de Salud",
+                notifyHealthHelp: "Enviar un mensaje cuando el estado de salud de un contenedor cambia o se recupera.",
+                whitelistOnlyLabel: "Solo Lista Blanca",
+                whitelistOnlyHelp: "Monitorizar solo eventos de contenedores con la etiqueta telegram-notifier.monitor=true.",
+                activeHoursTitle: "Horas Activas (Active Hours)",
+                activeHoursHelp: "Pausar actualizaciones automáticas y reinicios de contenedores durante horas de uso activo (ej. viendo Plex).",
+                activeHoursDesc: "Pausar actualizaciones automáticas durante horas de uso (ej. Plex)",
+                activateLabel: "Activar",
+                activeStartLabel: "Inicio (Pausar)",
+                activeStartHelp: "Hora a partir de la cual no se aplicarán actualizaciones automáticas.",
+                activeEndLabel: "Fin (Reanudar)",
+                activeEndHelp: "Hora a partir de la cual finalizan las horas activas y se permiten actualizaciones automáticas.",
+                updateWindowLabel: "Ventana de actualización:",
+                toWord: "a",
+                pausedNowStatus: "Pausadas ahora",
+                windowOpenStatus: "Ventana abierta",
+                disabledStatus: "Desactivado",
+                saveGlobalSettingsBtn: "Guardar Ajustes Globales",
+                thContainer: "Contenedor",
+                thImage: "Imagen",
+                thStatus: "Estado",
+                thAutoUpdate: "Auto-Actualizar",
+                thQuarantineStatus: "Estado de Cuarentena",
+                thLastUpdated: "Última Actualización",
+                badgeRunning: "En ejecución",
+                badgeExited: "Detenido",
+                autoUpdateEnabledTitle: "Auto-Actualización activada (Clic para desactivar)",
+                autoUpdateDisabledTitle: "Auto-Actualización desactivada (Clic para activar)",
+                badgeSnoozed: "🔕 Silenciado",
+                snoozedTitle: "Silenciado durante 30 días",
+                btnUnsnooze: "Reactivar",
+                daysLeft: "días restantes",
+                fastUpdateNotice: "¡Actualización rápida detectada durante la cuarentena!",
+                notInQuarantine: "Sin cuarentena",
+                neverUpdated: "Nunca",
+                poweredBy: "Desarrollado con"
+            },
+            en: {
+                appTitle: "TelegramTower Dashboard",
+                activeHoursHeader: "Active Hours:",
+                statusPaused: "Paused",
+                statusAllowed: "Allowed",
+                containersCount: "Containers",
+                botConfigTitle: "Bot Configuration",
+                botConfigDesc: "Update your Telegram credentials. Settings saved here override environment variables.",
+                conflictToken: "Conflict Detected: The web token is being used. It is recommended to use only one (web or environment variable) to avoid conflicts.",
+                conflictChatId: "Conflict Detected: The web Chat ID is being used. It is recommended to use only one to avoid conflicts.",
+                placeholderBotToken: "Enter Telegram Bot Token...",
+                placeholderChatId: "Enter Telegram Chat ID...",
+                saveCredentialsBtn: "Save Credentials",
+                restartContainerNotice: "Restart container to apply changes.",
+                globalSettingsTitle: "Global Settings",
+                globalSettingsDesc: "Configure global update checking and cleanup preferences.",
+                checkIntervalLabel: "Check Interval (Days)",
+                checkIntervalHelp: "How often to check for image updates on Docker Hub.",
+                opt1Day: "1 Day",
+                opt7Days: "7 Days",
+                opt30Days: "30 Days",
+                requestDelayLabel: "Request Delay (Secs)",
+                requestDelayHelp: "Delay between requests to Docker Hub to prevent rate limiting.",
+                quarantineDelayLabel: "Quarantine Delay (Days)",
+                quarantineDaysHelp: "Wait this many days before notifying about a new image update. Helps avoid unstable releases.",
+                optNone0: "None (0)",
+                opt3Days: "3 Days",
+                opt5Days: "5 Days",
+                cleanupOldImagesLabel: "Cleanup Old Images",
+                cleanupHelp: "Automatically remove the old Docker image after a container is successfully updated.",
+                checkStoppedLabel: "Check Stopped",
+                checkStoppedHelp: "Also check for updates for containers that are currently stopped.",
+                liveEventsTitle: "Live Event Notifications",
+                liveEventsHelp: "Enable real-time Telegram notifications for container lifecycle events.",
+                liveEventsDesc: "Monitor real-time Docker events via Telegram",
+                enableEventsLabel: "Enable Events",
+                enableEventsHelp: "Send Telegram messages when container lifecycle events occur.",
+                notifyStartLabel: "Notify on Start",
+                notifyStartHelp: "Send a message when a container starts.",
+                notifyStopLabel: "Notify on Crash/Stop",
+                notifyStopHelp: "Send a message when a container stops or crashes.",
+                notifyHealthLabel: "Notify Health Changes",
+                notifyHealthHelp: "Send a message when a container healthcheck fails or recovers.",
+                whitelistOnlyLabel: "Whitelist Only",
+                whitelistOnlyHelp: "Only monitor events for containers with the telegram-notifier.monitor=true label.",
+                activeHoursTitle: "Active Hours",
+                activeHoursHelp: "Pause automatic container updates/restarts during active use (e.g. while watching Plex).",
+                activeHoursDesc: "Pause automatic updates during active usage hours (e.g. Plex)",
+                activateLabel: "Enable",
+                activeStartLabel: "Start (Pause)",
+                activeStartHelp: "Time after which automatic updates will not be applied.",
+                activeEndLabel: "End (Resume)",
+                activeEndHelp: "Time after which active hours end and automatic updates are allowed.",
+                updateWindowLabel: "Update window:",
+                toWord: "to",
+                pausedNowStatus: "Paused now",
+                windowOpenStatus: "Window open",
+                disabledStatus: "Disabled",
+                saveGlobalSettingsBtn: "Save Global Settings",
+                thContainer: "Container",
+                thImage: "Image",
+                thStatus: "Status",
+                thAutoUpdate: "Auto-Update",
+                thQuarantineStatus: "Quarantine Status",
+                thLastUpdated: "Last Updated",
+                badgeRunning: "Running",
+                badgeExited: "Exited",
+                autoUpdateEnabledTitle: "Auto-Update Enabled (Click to Disable)",
+                autoUpdateDisabledTitle: "Auto-Update Disabled (Click to Enable)",
+                badgeSnoozed: "🔕 Snoozed",
+                snoozedTitle: "Muted for 30 days",
+                btnUnsnooze: "Un-snooze",
+                daysLeft: "days left",
+                fastUpdateNotice: "Fast update detected during quarantine!",
+                notInQuarantine: "Not in quarantine",
+                neverUpdated: "Never",
+                poweredBy: "Powered by"
+            }
+        };
+
+        // Detect browser / system language: Spanish -> 'es', Any other language -> 'en'
+        function detectLanguage() {
+            const saved = localStorage.getItem('tt_lang');
+            if (saved && (saved === 'es' || saved === 'en')) {
+                return saved;
+            }
+            const serverLang = document.documentElement.getAttribute('data-server-lang');
+            if (serverLang && (serverLang === 'es' || serverLang === 'en')) {
+                return serverLang;
+            }
+            const navLang = (navigator.language || navigator.userLanguage || 'en').toLowerCase();
+            return navLang.startsWith('es') ? 'es' : 'en';
+        }
+
+        let currentLang = detectLanguage();
+
+        function applyLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('tt_lang', lang);
+            document.documentElement.lang = lang;
+
+            // Send background sync request to save preference in config_db
+            try {
+                const formData = new URLSearchParams();
+                formData.append('action', 'set_language');
+                formData.append('language', lang);
+                fetch('/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                }).catch(() => {});
+            } catch (e) {}
+
+            const t = translations[lang] || translations.en;
+
+            // Translate elements with data-i18n attribute
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (t[key]) el.textContent = t[key];
+            });
+
+            // Translate placeholders
+            document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+                const key = el.getAttribute('data-i18n-ph');
+                if (t[key]) el.setAttribute('placeholder', t[key]);
+            });
+
+            // Translate titles / tooltips
+            document.querySelectorAll('[data-i18n-title]').forEach(el => {
+                const key = el.getAttribute('data-i18n-title');
+                if (t[key]) el.setAttribute('title', t[key]);
+            });
+
+            // Update language toggle button text: shows the OTHER language to switch to
+            const langBtnText = document.getElementById('lang-btn-text');
+            if (langBtnText) {
+                langBtnText.textContent = (lang === 'es') ? 'EN' : 'ES';
+            }
+        }
+
+        function toggleLanguage() {
+            const nextLang = (currentLang === 'es') ? 'en' : 'es';
+            applyLanguage(nextLang);
+        }
+
+        // Apply language on initial load
+        document.addEventListener('DOMContentLoaded', () => {
+            applyLanguage(currentLang);
+        });
+
+        // Table Sorting Logic
         let currentSort = { column: -1, asc: true };
         
         function sortTable(columnIndex) {
@@ -408,5 +651,4 @@
         }
     </script>
 </body>
-
 </html>

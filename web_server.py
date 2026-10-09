@@ -98,6 +98,13 @@ def dashboard() -> Any:
                 container_name = request.form.get("container_name")
                 if container_name:
                     config_db.clear_snooze(container_name)
+            elif action == "set_language":
+                new_lang = request.form.get("language", "").strip()
+                if new_lang in ("en", "es"):
+                    config_db.set_language(new_lang)
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.is_json:
+                    return {"status": "ok", "language": new_lang}
+                return redirect(url_for("dashboard"))
 
             return redirect(url_for("dashboard"))
 
@@ -134,6 +141,7 @@ def dashboard() -> Any:
             "active_hours_end": config_db.get_active_hours_end(),
             "is_in_active_hours": config_db.is_in_active_hours(),
             "server_time": datetime.datetime.now().strftime("%H:%M"),
+            "language": config_db.get_language(),
         }
 
         last_updated_dict = config_db.get_all_last_updated()
