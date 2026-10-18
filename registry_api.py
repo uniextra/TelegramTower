@@ -146,6 +146,68 @@ class RegistryFetcher:
             return None
 
     @staticmethod
+    def extract_version_from_labels(labels: Optional[Dict[str, Any]]) -> Optional[str]:
+        """
+        Extracts a clean version string from image labels.
+        Supports standard OCI/label-schema labels and LinuxServer.io build_version strings.
+        """
+        if not labels or not isinstance(labels, dict):
+            return None
+
+        # 1. Direct OCI or standard version labels
+        for key in (
+            "org.opencontainers.image.version",
+            "version",
+            "org.label-schema.version",
+            "image.version",
+        ):
+            val = labels.get(key)
+            if val and isinstance(val, str) and val.strip():
+                return val.strip()
+
+        # 2. LinuxServer.io build_version label (e.g. "Linuxserver.io version:- v1.6.2-ls368 Build-date:- ...")
+        build_version = labels.get("build_version")
+        if build_version and isinstance(build_version, str):
+            match = re.search(r"version:-\s*([^\s]+)", build_version, re.IGNORECASE)
+            if match:
+                val = match.group(1).strip()
+                if not val.lower().startswith("build-date"):
+                    return val
+            cleaned = build_version.strip()
+            if cleaned and not cleaned.lower().startswith("linuxserver.io"):
+                return cleaned
+
+        return None
+
+    @staticmethod
+    def extract_source_from_labels(labels: Optional[Dict[str, Any]]) -> Optional[str]:
+        """
+        Extracts a valid http(s) source/repository/changelog URL from image labels.
+        """
+        if not labels or not isinstance(labels, dict):
+            return None
+
+        for key in (
+            "org.opencontainers.image.source",
+            "org.opencontainers.image.url",
+            "org.label-schema.vcs-url",
+            "org.label-schema.url",
+        ):
+            val = labels.get(key)
+            if val and isinstance(val, str) and val.strip():
+                url = val.strip()
+                if url.startswith("git@github.com:"):
+                    url = "https://github.com/" + url[len("git@github.com:") :].removesuffix(".git")
+                elif url.startswith("git://"):
+                    url = "https://" + url[len("git://") :].removesuffix(".git")
+                elif url.startswith(("github.com/", "gitlab.com/")):
+                    url = "https://" + url
+                if url.startswith(("http://", "https://")):
+                    return url
+
+        return None
+
+    @staticmethod
     def get_remote_image_info(image_name: str) -> Optional[Dict[str, Any]]:
         """
         Full flow: parse image -> auth -> manifest -> config blob.
@@ -178,14 +240,8 @@ class RegistryFetcher:
                 created = config_json.get("created")
 
                 labels = config_json.get("config", {}).get("Labels") or {}
-                version = labels.get("org.opencontainers.image.version") or labels.get(
-                    "version"
-                )
-                source = (
-                    labels.get("org.opencontainers.image.source")
-                    or labels.get("org.opencontainers.image.url")
-                    or labels.get("org.label-schema.vcs-url")
-                )
+                version = RegistryFetcher.extract_version_from_labels(labels)
+                source = RegistryFetcher.extract_source_from_labels(labels)
 
                 return {
                     "created": created,

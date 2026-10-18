@@ -144,3 +144,40 @@ def test_update_container_rollback_on_failure(mock_docker_client):
     mock_container.rename.assert_any_call("my_app_tt_backup")
     mock_container.rename.assert_any_call("my_app")
     mock_container.start.assert_called_once()
+
+
+def test_update_container_success_with_version_and_source(mock_docker_client):
+    manager = DockerManager()
+    mock_container = MagicMock()
+    mock_container.name = "bazarr"
+    mock_container.status = "running"
+    mock_container.attrs = {
+        "Config": {"Image": "lscr.io/linuxserver/bazarr:latest", "Cmd": None, "Env": None, "Labels": {}},
+        "HostConfig": {"Binds": None, "PortBindings": None, "NetworkMode": "bridge", "RestartPolicy": {}},
+        "NetworkSettings": {"Networks": {}},
+    }
+    mock_container.image.id = "sha256:old"
+    manager.client.containers.get.return_value = mock_container
+
+    new_img = MagicMock()
+    new_img.id = "sha256:new"
+    new_img.attrs = {
+        "Config": {
+            "Labels": {
+                "org.opencontainers.image.version": "v1.6.2-ls368",
+                "org.opencontainers.image.source": "https://github.com/linuxserver/docker-bazarr",
+            }
+        }
+    }
+    manager.client.images.pull.return_value = new_img
+
+    recreated = MagicMock()
+    recreated.name = "bazarr"
+    manager.client.containers.run.return_value = recreated
+
+    success, msg_key, details = manager.update_container("c_id")
+    assert success is True
+    assert msg_key == "update_success"
+    assert details["version"] == "v1.6.2-ls368"
+    assert details["source"] == "https://github.com/linuxserver/docker-bazarr"
+

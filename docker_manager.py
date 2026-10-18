@@ -289,6 +289,20 @@ class DockerManager:
                     else:
                         logger.warning(f"Failed to remove old image {old_image_id}: {clean_e}")
 
+            attrs = getattr(new_image, "attrs", None)
+            new_labels = {}
+            if isinstance(attrs, dict):
+                config = attrs.get("Config")
+                if isinstance(config, dict):
+                    new_labels = config.get("Labels") or {}
+            elif isinstance(getattr(new_image, "labels", None), dict):
+                new_labels = new_image.labels
+
+            from registry_api import RegistryFetcher
+
+            version = RegistryFetcher.extract_version_from_labels(new_labels)
+            source = RegistryFetcher.extract_source_from_labels(new_labels)
+
             return (
                 True,
                 "update_success",
@@ -297,6 +311,8 @@ class DockerManager:
                     "was_running": is_running,
                     "cleaned_up": cleaned_up,
                     "dependents": recreated_dependents,
+                    "version": version,
+                    "source": source,
                 },
             )
 

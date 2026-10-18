@@ -71,7 +71,9 @@ async def test_button_handler_update(mock_docker_manager, mock_config_db, mocker
 
     mock_docker_manager.update_container.assert_called_once_with("12345", True)
     mock_update.callback_query.edit_message_text.assert_called_with(
-        text="✅ Success: Updated mycontainer and started successfully. Old image removed."
+        text="✅ Success: Updated mycontainer and started successfully. Old image removed.",
+        parse_mode="Markdown",
+        disable_web_page_preview=True,
     )
 
 
@@ -109,7 +111,11 @@ async def test_button_handler_update_with_dependents(mock_docker_manager, mock_c
         "✅ Éxito: Contenedor gluetun actualizado e iniciado con éxito. Imagen antigua eliminada.\n"
         "🔗 Servicios dependientes del stack recreados: radarr, qbittorrent."
     )
-    mock_update.callback_query.edit_message_text.assert_called_with(text=expected_text)
+    mock_update.callback_query.edit_message_text.assert_called_with(
+        text=expected_text,
+        parse_mode="Markdown",
+        disable_web_page_preview=True,
+    )
 
 
 @pytest.mark.asyncio
@@ -285,6 +291,89 @@ def test_update_language_respects_manual_config(mock_docker_manager, mock_config
     mock_config_db.get_config.return_value = None
     bot._update_language(update)
     mock_config_db.set_language.assert_called_with("en")
+
+
+def test_format_update_result_with_version_and_source(mock_docker_manager, mock_config_db, mocker):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+    mock_config_db.get_language.return_value = "en"
+
+    result = (
+        True,
+        "update_success",
+        {
+            "name": "bazarr",
+            "was_running": True,
+            "cleaned_up": True,
+            "dependents": [],
+            "version": "v1.6.2-ls368",
+            "source": "https://github.com/linuxserver/docker-bazarr",
+        },
+    )
+    formatted = bot.format_update_result(result)
+    assert "📦 Version: `v1.6.2-ls368`" in formatted
+    assert "🔗 [Changelog / Source](https://github.com/linuxserver/docker-bazarr)" in formatted
+
+
+@pytest.mark.asyncio
+async def test_check_containers_job_auto_update_includes_version(
+    mock_docker_manager, mock_config_db, mocker
+):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+    bot.application.bot.send_message = AsyncMock()
+
+    mock_container = MagicMock()
+    mock_container.name = "bazarrVPN"
+    mock_container.id = "bazarr123"
+    mock_container.status = "running"
+    mock_container.labels = {}
+    mock_docker_manager.get_containers.return_value = [mock_container]
+
+    remote_info = {
+        "version": "v1.6.2-ls368",
+        "source": "https://github.com/linuxserver/docker-bazarr",
+    }
+    mock_docker_manager.check_for_updates.return_value = (
+        "lscr.io/linuxserver/bazarr:latest",
+        "sha256:newdigest",
+        remote_info,
+        False,
+    )
+    mock_docker_manager.update_container.return_value = (
+        True,
+        "update_success",
+        {
+            "name": "bazarrVPN",
+            "was_running": True,
+            "cleaned_up": True,
+            "dependents": [],
+            "version": "v1.6.2-ls368",
+            "source": "https://github.com/linuxserver/docker-bazarr",
+        },
+    )
+
+    mock_config_db.is_snoozed.return_value = False
+    mock_config_db.get_ignored_update.return_value = None
+    mock_config_db.get_quarantine_days.return_value = 0
+    mock_config_db.get_quarantine_record.return_value = None
+    mock_config_db.get_auto_update.return_value = True
+    mock_config_db.is_in_active_hours.return_value = False
+    mock_config_db.get_language.return_value = "en"
+
+    context = MagicMock()
+    await bot._check_containers_job(context)
+
+    bot.application.bot.send_message.assert_called_once()
+    call_kwargs = bot.application.bot.send_message.call_args[1]
+    sent_text = call_kwargs["text"]
+
+    assert "🚀 Automatically updated container *bazarrVPN* to new image:" in sent_text
+    assert "lscr.io/linuxserver/bazarr:latest" in sent_text
+    assert "📦 Version: `v1.6.2-ls368`" in sent_text
+    assert "🔗 [Changelog / Source](https://github.com/linuxserver/docker-bazarr)" in sent_text
+    assert call_kwargs.get("disable_web_page_preview") is True
+
 
 
 

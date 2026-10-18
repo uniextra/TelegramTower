@@ -193,6 +193,18 @@ class TelegramBot:
             return text.format(**kwargs)
         return text
 
+    def _format_version_and_source(
+        self, version: Optional[str], source: Optional[str]
+    ) -> str:
+        text = ""
+        if version:
+            clean_ver = str(version).replace("`", "")
+            text += f"\n📦 {self.t('version_label')}: `{clean_ver}`"
+        if source:
+            link_text = self.t("source_label")
+            text += f"\n🔗 [{link_text}]({source})"
+        return text
+
     def format_update_result(self, result):
         if isinstance(result, tuple) and len(result) == 3:
             success, key, params = result
@@ -205,13 +217,17 @@ class TelegramBot:
                     if params.get("was_running")
                     else "update_success_stopped"
                 )
+                safe_name = escape_markdown(params.get("name", ""))
                 msg = self.t(
-                    template_key, name=params.get("name", ""), cleanup=cleanup_str
+                    template_key, name=safe_name, cleanup=cleanup_str
                 )
                 deps = params.get("dependents", [])
                 if deps:
-                    deps_list = ", ".join(deps)
-                    msg += self.t("dependents_recreated", deps=deps_list)
+                    safe_deps = ", ".join([escape_markdown(d) for d in deps])
+                    msg += self.t("dependents_recreated", deps=safe_deps)
+                msg += self._format_version_and_source(
+                    params.get("version"), params.get("source")
+                )
                 return msg
             return self.t(key, **params)
         elif isinstance(result, tuple) and len(result) == 2:
@@ -656,14 +672,9 @@ class TelegramBot:
                 "update_msg", container=container_name, state=state_str, image=new_image
             )
             if remote_info:
-                version = remote_info.get("version")
-                source = remote_info.get("source")
-
-                if version:
-                    msg += f"\n📦 {self.t('version_label')}: `{version}`"
-                if source:
-                    link_text = self.t("source_label")
-                    msg += f"\n🔗 [{link_text}]({source})"
+                msg += self._format_version_and_source(
+                    remote_info.get("version"), remote_info.get("source")
+                )
 
         keyboard = [
             [
@@ -916,7 +927,15 @@ class TelegramBot:
                 self.config_db.set_last_updated(container_name, datetime.datetime.now(datetime.timezone.utc).isoformat())
                 self.pending_updates.pop(container_name, None)
 
-            await query.edit_message_text(text=f"{status}: {msg_str}")
+            try:
+                await query.edit_message_text(
+                    text=f"{status}: {msg_str}",
+                    parse_mode="Markdown",
+                    disable_web_page_preview=True,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to edit message with markdown parse mode: {e}")
+                await query.edit_message_text(text=f"{status}: {msg_str}")
 
     # --- Core Logic ---
 
@@ -1102,6 +1121,14 @@ class TelegramBot:
                             container=escape_markdown(container.name),
                             image=new_image,
                         )
+                        version = (remote_info.get("version") if remote_info else None) or (
+                            result[2].get("version") if len(result) == 3 and isinstance(result[2], dict) else None
+                        )
+                        source = (remote_info.get("source") if remote_info else None) or (
+                            result[2].get("source") if len(result) == 3 and isinstance(result[2], dict) else None
+                        )
+                        msg += self._format_version_and_source(version, source)
+
                         deps = (
                             result[2].get("dependents", [])
                             if len(result) == 3 and isinstance(result[2], dict)
@@ -1118,7 +1145,10 @@ class TelegramBot:
 
                     try:
                         await self.application.bot.send_message(
-                            chat_id=self.chat_id, text=msg, parse_mode="Markdown"
+                            chat_id=self.chat_id,
+                            text=msg,
+                            parse_mode="Markdown",
+                            disable_web_page_preview=True,
                         )
                     except Exception as e:
                         logger.error(f"Failed to send auto-update msg: {e}")
