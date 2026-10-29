@@ -94,3 +94,15 @@ def test_active_hours_logic(temp_db):
     assert db.is_in_active_hours(datetime.datetime(2026, 10, 9, 17, 59)) is True
     assert db.is_in_active_hours(datetime.datetime(2026, 10, 9, 18, 0)) is False
 
+
+def test_notified_update_methods(temp_db):
+    db = ConfigDB(temp_db)
+    assert db.get_notified_update("my_container") is None
+
+    db.set_notified_update("my_container", "sha256:abc123")
+    assert db.get_notified_update("my_container") == "sha256:abc123"
+
+    db.clear_notified_update("my_container")
+    assert db.get_notified_update("my_container") is None
+
+

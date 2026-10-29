@@ -710,8 +710,10 @@ class TelegramBot:
                 parse_mode="Markdown",
                 disable_web_page_preview=True,
             )
+            return True
         except Exception as e:
             logger.error(f"Failed to send message: {e}")
+            return False
 
     async def button_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         self._update_language(update)
@@ -863,7 +865,7 @@ class TelegramBot:
             return
 
         if action == "ignore":
-            remote_digest = self.pending_updates.get(container_name)
+            remote_digest = self.pending_updates.get(container_name) or self.config_db.get_notified_update(container_name)
             if not remote_digest:
                 # Re-fetch it just in case memory was cleared
                 include_stopped = self.config_db.get_include_stopped()
@@ -878,6 +880,8 @@ class TelegramBot:
 
             if remote_digest:
                 self.config_db.set_ignored_update(container_name, remote_digest)
+            self.config_db.clear_notified_update(container_name)
+            self.pending_updates.pop(container_name, None)
 
             await query.edit_message_text(
                 text=self.t("ignored_msg", container=container_name)
@@ -887,6 +891,8 @@ class TelegramBot:
         if action == "snooze":
             self.config_db.set_snooze(container_name, 30)
             self.config_db.delete_quarantine_record(container_name)
+            self.config_db.clear_notified_update(container_name)
+            self.pending_updates.pop(container_name, None)
             msg = self.t("snoozed_msg", container=container_name)
             await query.edit_message_text(text=msg, parse_mode="Markdown")
             return
@@ -928,6 +934,7 @@ class TelegramBot:
             if success:
                 import datetime
                 self.config_db.set_last_updated(container_name, datetime.datetime.now(datetime.timezone.utc).isoformat())
+                self.config_db.clear_notified_update(container_name)
                 self.pending_updates.pop(container_name, None)
 
             try:
@@ -1140,6 +1147,7 @@ class TelegramBot:
                         if deps:
                             safe_deps = ", ".join([escape_markdown(d) for d in deps])
                             msg += self.t("dependents_recreated", deps=safe_deps)
+                        self.config_db.clear_notified_update(container.name)
                         self.config_db.clear_snooze(container.name)
                     else:
                         msg = self.t(
@@ -1156,13 +1164,19 @@ class TelegramBot:
                     except Exception as e:
                         logger.error(f"Failed to send auto-update msg: {e}")
                 else:
-                    # Store pending update and notify user manually
                     self.pending_updates[container.name] = remote_digest
+                    notified_digest = self.config_db.get_notified_update(container.name)
+                    if notified_digest == remote_digest:
+                        logger.info(
+                            f"Update for {container.name} (digest: {remote_digest}) was already notified. Skipping duplicate notification."
+                        )
+                        continue
+
                     logger.info(
                         f"Update found for {container.name}: {new_image}. Sending notification..."
                     )
                     is_stopped = container.status != "running"
-                    await self.send_update_notification(
+                    sent = await self.send_update_notification(
                         container.name, 
                         new_image, 
                         is_stopped, 
@@ -1170,9 +1184,16 @@ class TelegramBot:
                         is_same_version=is_same_version,
                         reset_count=q_record.get("reset_count", 0) if (q_days > 0 and q_record) else 0
                     )
+                    if sent:
+                        self.config_db.set_notified_update(container.name, remote_digest)
             else:
                 logger.info(f"No update for {container.name}")
                 self.config_db.delete_quarantine_record(container.name)
+                local_digests = getattr(container.image, "attrs", {}).get("RepoDigests", []) if container.image else []
+                notified_digest = self.config_db.get_notified_update(container.name)
+                if notified_digest and any(notified_digest in ld for ld in local_digests):
+                    self.config_db.clear_notified_update(container.name)
+                self.pending_updates.pop(container.name, None)
 
     def _schedule_deferred_active_hours_check(self):
         """Schedules a one-off container check right after active hours end."""

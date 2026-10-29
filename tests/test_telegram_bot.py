@@ -375,5 +375,148 @@ async def test_check_containers_job_auto_update_includes_version(
     assert call_kwargs.get("disable_web_page_preview") is True
 
 
+@pytest.mark.asyncio
+async def test_check_containers_job_manual_skips_duplicate_notification(
+    mock_docker_manager, mock_config_db, mocker
+):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+    bot.send_update_notification = AsyncMock(return_value=True)
+
+    mock_container = MagicMock()
+    mock_container.name = "Movistar"
+    mock_container.id = "mov123"
+    mock_container.status = "exited"
+    mock_container.labels = {}
+    mock_docker_manager.get_containers.return_value = [mock_container]
+
+    mock_docker_manager.check_for_updates.return_value = (
+        "uniextra/movistar-cloud:latest",
+        "sha256:digest123",
+        {"version": "latest", "source": "https://github.com/a"},
+        False,
+    )
+
+    mock_config_db.is_snoozed.return_value = False
+    mock_config_db.get_ignored_update.return_value = None
+    mock_config_db.get_quarantine_days.return_value = 0
+    mock_config_db.get_quarantine_record.return_value = None
+    mock_config_db.get_auto_update.return_value = False
+    mock_config_db.get_notified_update.return_value = None
+
+    context = MagicMock()
+
+    # 1. First run: not yet notified -> sends notification and records notified digest
+    await bot._check_containers_job(context)
+    bot.send_update_notification.assert_called_once()
+    mock_config_db.set_notified_update.assert_called_with("Movistar", "sha256:digest123")
+
+    # 2. Second run (e.g. deferred check or next schedule): already notified -> skips duplicate
+    bot.send_update_notification.reset_mock()
+    mock_config_db.get_notified_update.return_value = "sha256:digest123"
+
+    await bot._check_containers_job(context)
+    bot.send_update_notification.assert_not_called()
+    assert bot.pending_updates["Movistar"] == "sha256:digest123"
+
+
+@pytest.mark.asyncio
+async def test_check_containers_job_manual_renotifies_on_new_digest(
+    mock_docker_manager, mock_config_db, mocker
+):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+    bot.send_update_notification = AsyncMock(return_value=True)
+
+    mock_container = MagicMock()
+    mock_container.name = "ryot"
+    mock_container.id = "ryot123"
+    mock_container.status = "running"
+    mock_container.labels = {}
+    mock_docker_manager.get_containers.return_value = [mock_container]
+
+    # Container was previously notified for digest1, but registry now has digest2
+    mock_docker_manager.check_for_updates.return_value = (
+        "ignisda/ryot:v10",
+        "sha256:digest2",
+        {"version": "v10", "source": None},
+        False,
+    )
+
+    mock_config_db.is_snoozed.return_value = False
+    mock_config_db.get_ignored_update.return_value = None
+    mock_config_db.get_quarantine_days.return_value = 0
+    mock_config_db.get_quarantine_record.return_value = None
+    mock_config_db.get_auto_update.return_value = False
+    mock_config_db.get_notified_update.return_value = "sha256:digest1"
+
+    context = MagicMock()
+    await bot._check_containers_job(context)
+
+    bot.send_update_notification.assert_called_once()
+    mock_config_db.set_notified_update.assert_called_with("ryot", "sha256:digest2")
+
+
+@pytest.mark.asyncio
+async def test_check_containers_job_manual_send_failure_does_not_record_notified(
+    mock_docker_manager, mock_config_db, mocker
+):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+    # Simulate send failure
+    bot.send_update_notification = AsyncMock(return_value=False)
+
+    mock_container = MagicMock()
+    mock_container.name = "Movistar"
+    mock_container.id = "mov123"
+    mock_container.status = "exited"
+    mock_container.labels = {}
+    mock_docker_manager.get_containers.return_value = [mock_container]
+
+    mock_docker_manager.check_for_updates.return_value = (
+        "uniextra/movistar-cloud:latest",
+        "sha256:digest123",
+        {"version": "latest", "source": None},
+        False,
+    )
+
+    mock_config_db.is_snoozed.return_value = False
+    mock_config_db.get_ignored_update.return_value = None
+    mock_config_db.get_quarantine_days.return_value = 0
+    mock_config_db.get_quarantine_record.return_value = None
+    mock_config_db.get_auto_update.return_value = False
+    mock_config_db.get_notified_update.return_value = None
+
+    context = MagicMock()
+    await bot._check_containers_job(context)
+
+    bot.send_update_notification.assert_called_once()
+    mock_config_db.set_notified_update.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_button_handler_ignore_uses_notified_update_fallback(
+    mock_docker_manager, mock_config_db, mocker
+):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+
+    # pending_updates in memory is empty (e.g. after restart), but DB has notified_digest
+    mock_config_db.get_notified_update.return_value = "sha256:saved_digest"
+
+    mock_update = MagicMock()
+    mock_update.callback_query.data = "ignore_mycontainer"
+    mock_update.callback_query.answer = AsyncMock()
+    mock_update.callback_query.edit_message_text = AsyncMock()
+
+    mock_context = MagicMock()
+    await bot.button_handler(mock_update, mock_context)
+
+    mock_config_db.set_ignored_update.assert_called_with("mycontainer", "sha256:saved_digest")
+    mock_config_db.clear_notified_update.assert_called_with("mycontainer")
+
+
+
+
 
 

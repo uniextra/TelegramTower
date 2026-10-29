@@ -98,6 +98,18 @@ class ConfigDB:
         if digest:
             self.set_config(f"ignored_{container_name}", digest)
 
+    def get_notified_update(self, container_name: str) -> Optional[str]:
+        return self.get_config(f"notified_{container_name}")
+
+    def set_notified_update(self, container_name: str, digest: str) -> None:
+        if digest:
+            self.set_config(f"notified_{container_name}", digest)
+
+    def clear_notified_update(self, container_name: str) -> None:
+        with sqlite3.connect(self.db_path, timeout=15) as conn:
+            conn.execute("DELETE FROM config WHERE key = ?", (f"notified_{container_name}",))
+            conn.commit()
+
     def get_auto_update(self, container_name: str) -> bool:
         return self.get_config(f"auto_{container_name}", "0") == "1"
 
