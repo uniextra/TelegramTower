@@ -168,9 +168,15 @@ class TelegramBot:
         self.chat_id = chat_id
         self.docker_manager = docker_manager
         self.config_db = config_db
-        self.application = Application.builder().token(self.token).build()
+        self.application = (
+            Application.builder()
+            .token(self.token)
+            .concurrent_updates(True)
+            .build()
+        )
         self._check_job = None
         self.pending_updates = {}
+        self._updating_containers = set()
         self._setup_handlers()
 
     def _setup_handlers(self):
@@ -898,54 +904,63 @@ class TelegramBot:
             return
 
         if action in ["update", "auto"]:
-            if action == "auto":
-                self.config_db.set_auto_update(container_name, True)
-                await query.edit_message_text(
-                    text=self.t("auto_updating_msg", container=container_name)
-                )
-            else:
-                await query.edit_message_text(
-                    text=self.t("updating_msg", container=container_name)
-                )
-
-            include_stopped = self.config_db.get_include_stopped()
-            containers = await asyncio.to_thread(
-                self.docker_manager.get_containers, include_stopped
-            )
-            target = next((c for c in containers if c.name == container_name), None)
-
-            if not target:
-                await query.edit_message_text(
-                    text=self.t("not_found_msg", container=container_name)
+            if container_name in self._updating_containers:
+                logger.warning(
+                    f"Container {container_name} is already being updated. Skipping duplicate request."
                 )
                 return
-
-            cleanup = self.config_db.get_cleanup_old_image()
-
-            # Execute the heavy update process in a separate thread so it doesn't block the UI
-            result = await asyncio.to_thread(
-                self.docker_manager.update_container, target.id, cleanup
-            )
-            success = result[0]
-            msg_str = self.format_update_result(result)
-
-            status = self.t("success") if success else self.t("failed")
-
-            if success:
-                import datetime
-                self.config_db.set_last_updated(container_name, datetime.datetime.now(datetime.timezone.utc).isoformat())
-                self.config_db.clear_notified_update(container_name)
-                self.pending_updates.pop(container_name, None)
-
+            self._updating_containers.add(container_name)
             try:
-                await query.edit_message_text(
-                    text=f"{status}: {msg_str}",
-                    parse_mode="Markdown",
-                    disable_web_page_preview=True,
+                if action == "auto":
+                    self.config_db.set_auto_update(container_name, True)
+                    await query.edit_message_text(
+                        text=self.t("auto_updating_msg", container=container_name)
+                    )
+                else:
+                    await query.edit_message_text(
+                        text=self.t("updating_msg", container=container_name)
+                    )
+
+                include_stopped = self.config_db.get_include_stopped()
+                containers = await asyncio.to_thread(
+                    self.docker_manager.get_containers, include_stopped
                 )
-            except Exception as e:
-                logger.warning(f"Failed to edit message with markdown parse mode: {e}")
-                await query.edit_message_text(text=f"{status}: {msg_str}")
+                target = next((c for c in containers if c.name == container_name), None)
+
+                if not target:
+                    await query.edit_message_text(
+                        text=self.t("not_found_msg", container=container_name)
+                    )
+                    return
+
+                cleanup = self.config_db.get_cleanup_old_image()
+
+                # Execute the heavy update process in a separate thread so it doesn't block the UI
+                result = await asyncio.to_thread(
+                    self.docker_manager.update_container, target.id, cleanup
+                )
+                success = result[0]
+                msg_str = self.format_update_result(result)
+
+                status = self.t("success") if success else self.t("failed")
+
+                if success:
+                    import datetime
+                    self.config_db.set_last_updated(container_name, datetime.datetime.now(datetime.timezone.utc).isoformat())
+                    self.config_db.clear_notified_update(container_name)
+                    self.pending_updates.pop(container_name, None)
+
+                try:
+                    await query.edit_message_text(
+                        text=f"{status}: {msg_str}",
+                        parse_mode="Markdown",
+                        disable_web_page_preview=True,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to edit message with markdown parse mode: {e}")
+                    await query.edit_message_text(text=f"{status}: {msg_str}")
+            finally:
+                self._updating_containers.discard(container_name)
 
     # --- Core Logic ---
 
@@ -1110,11 +1125,21 @@ class TelegramBot:
                         self._schedule_deferred_active_hours_check()
                         continue
 
+                    if container.name in self._updating_containers:
+                        logger.info(
+                            f"Container {container.name} is already being updated, skipping auto-update."
+                        )
+                        continue
+
                     logger.info(f"Auto-updating {container.name}...")
                     cleanup = self.config_db.get_cleanup_old_image()
-                    result = await asyncio.to_thread(
-                        self.docker_manager.update_container, container.id, cleanup
-                    )
+                    self._updating_containers.add(container.name)
+                    try:
+                        result = await asyncio.to_thread(
+                            self.docker_manager.update_container, container.id, cleanup
+                        )
+                    finally:
+                        self._updating_containers.discard(container.name)
                     success = result[0]
                     key = result[1] if len(result) > 1 else ""
                     msg_str = self.format_update_result(result)

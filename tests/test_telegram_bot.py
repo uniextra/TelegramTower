@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import telegram.ext
 
 from telegram_bot import TelegramBot
 
@@ -514,6 +515,91 @@ async def test_button_handler_ignore_uses_notified_update_fallback(
 
     mock_config_db.set_ignored_update.assert_called_with("mycontainer", "sha256:saved_digest")
     mock_config_db.clear_notified_update.assert_called_with("mycontainer")
+
+
+def test_telegram_bot_builder_concurrent_updates(mock_docker_manager, mock_config_db, mocker):
+    spy_concurrent = mocker.spy(telegram.ext.ApplicationBuilder, "concurrent_updates")
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+    spy_concurrent.assert_called_once_with(mocker.ANY, True)
+
+
+@pytest.mark.asyncio
+async def test_button_handler_duplicate_update_skipped(
+    mock_docker_manager, mock_config_db, mocker
+):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+
+    # Mark container as already updating
+    bot._updating_containers.add("mycontainer")
+
+    mock_update = MagicMock()
+    mock_update.callback_query.data = "update_mycontainer"
+    mock_update.callback_query.answer = AsyncMock()
+    mock_update.callback_query.edit_message_text = AsyncMock()
+
+    mock_context = MagicMock()
+    await bot.button_handler(mock_update, mock_context)
+
+    # update_container should NOT be called
+    mock_docker_manager.update_container.assert_not_called()
+    mock_update.callback_query.answer.assert_called_once()
+    mock_update.callback_query.edit_message_text.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_button_handler_concurrent_update_and_ignore(
+    mock_docker_manager, mock_config_db, mocker
+):
+    import asyncio
+    import time
+
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "fake_chat_id", mock_docker_manager, mock_config_db)
+    mock_config_db.get_language.return_value = "en"
+    mock_config_db.get_cleanup_old_image.return_value = True
+
+    c_a = MagicMock()
+    c_a.name = "containerA"
+    c_a.id = "1"
+    mock_docker_manager.get_containers.return_value = [c_a]
+
+    # Container A update takes time
+    def slow_update(cid, cleanup):
+        time.sleep(0.1)
+        return (True, "update_success_running", {"name": "containerA", "cleanup": ""})
+
+    mock_docker_manager.update_container.side_effect = slow_update
+
+    update_a = MagicMock()
+    update_a.callback_query.data = "update_containerA"
+    update_a.callback_query.answer = AsyncMock()
+    update_a.callback_query.edit_message_text = AsyncMock()
+
+    update_b = MagicMock()
+    update_b.callback_query.data = "ignore_containerB"
+    update_b.callback_query.answer = AsyncMock()
+    update_b.callback_query.edit_message_text = AsyncMock()
+    mock_config_db.get_notified_update.return_value = "sha256:digestB"
+
+    completion_order = []
+
+    async def run_update():
+        await bot.button_handler(update_a, MagicMock())
+        completion_order.append("update_a")
+
+    async def run_ignore():
+        await asyncio.sleep(0.01)
+        await bot.button_handler(update_b, MagicMock())
+        completion_order.append("ignore_b")
+
+    await asyncio.gather(run_update(), run_ignore())
+
+    # ignore_b should finish before update_a despite starting slightly later
+    assert completion_order == ["ignore_b", "update_a"]
+
 
 
 
