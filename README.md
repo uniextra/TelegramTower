@@ -15,6 +15,9 @@ TelegramTower is a lightweight, Watchtower-inspired Docker container update mana
 * **Exclude Containers:** Easily exclude specific containers from updates using standard labels.
 * **Event Notifications:** Get instant real-time alerts when your containers start (✅), stop/crash (🔴), or change health status (💚/🤒), fully customizable per container.
 * **Active Hours (Horas Activas):** Set custom active hours (inspired by Windows Update) where automatic updates and restarts are paused (e.g. `08:00 - 02:00`) so services like Plex are never interrupted while in use. Pending updates are automatically deferred and applied during the maintenance window.
+* **Release Version & Changelog Links:** Notifications automatically parse image release versions (including OCI labels, version schemas, and LinuxServer.io `build_version` tags) and display clickable links to release notes or source code when available.
+* **Non-Blocking & Concurrent Processing:** Actions like ignoring or snoozing a container execute instantly without freezing or waiting for slow image pulls/updates on other containers.
+* **Notification Deduplication:** Tracks notified digests in SQLite WAL so you receive exactly one alert per new release, without repetitive spam across Active Hours transitions or restarts.
 * **Multi-Language Support (EN / ES):** Full internationalization in both the Web Dashboard and Telegram. Switch dynamically between English and Spanish via the header toggle or `/language` / `/idioma` commands.
 
 ## Web Dashboard
