@@ -33,7 +33,7 @@ services:
     cap_drop:
       - ALL
     ports:
-      - "127.0.0.1:8080:8080"
+      - "${WEB_PORT:-8080}:8080"
     volumes:
       - ./data:/app/data
     environment:

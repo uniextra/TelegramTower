@@ -398,7 +398,7 @@ def start_web_server(docker_manager: Any, config_db: Any) -> None:
             )
             return
 
-    host = os.environ.get("WEB_HOST", "127.0.0.1")
+    host = os.environ.get("WEB_HOST", "0.0.0.0")
     port = int(os.environ.get("WEB_PORT", "8080"))
     logger.info(f"Starting Web Dashboard on {host}:{port}")
 
