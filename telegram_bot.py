@@ -91,6 +91,8 @@ STRINGS = {
         "success": "✅ Success",
         "failed": "❌ Failed",
         "unauthorized_alert": "⛔ You are not authorized to use this bot.",
+        "self_update_blocked": "⚠️ TelegramTower cannot update its own container to prevent unexpected shutdown.",
+        "socket_proxy_blocked": "⚠️ Updating docker-socket-proxy is blocked to preserve Docker daemon connectivity.",
     },
     "es": {
         "startup": "🤖 *¡TelegramTower ha iniciado!*\n\nEstoy listo para monitorizar tus contenedores Docker.",
@@ -161,6 +163,8 @@ STRINGS = {
         "success": "✅ Éxito",
         "failed": "❌ Error",
         "unauthorized_alert": "⛔ No estás autorizado para usar este bot.",
+        "self_update_blocked": "⚠️ TelegramTower no puede auto-actualizarse para evitar la interrupción del servicio.",
+        "socket_proxy_blocked": "⚠️ La actualización del socket-proxy está bloqueada para mantener la conexión Docker.",
     },
 }
 

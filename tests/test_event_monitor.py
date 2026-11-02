@@ -1,3 +1,4 @@
+import threading
 import pytest
 from unittest.mock import MagicMock
 
@@ -7,9 +8,9 @@ from event_monitor import EventMonitor, escape_markdown
 def test_escape_markdown():
     assert escape_markdown("my_nginx_app") == r"my\_nginx\_app"
     assert escape_markdown("app*name") == r"app\*name"
-    assert escape_markdown("bracket[test]") == r"bracket\[test]"
+    assert escape_markdown("bracket[test]") == r"bracket\[test\]"
     assert escape_markdown("code`block`") == r"code\`block\`"
-    assert escape_markdown("all_*[`test") == r"all\_\*\[\`test"
+    assert escape_markdown("all_*[`(test)") == r"all\_\*\[\`\(test\)"
     assert escape_markdown("") == ""
     assert escape_markdown(None) == ""
 
@@ -53,3 +54,17 @@ def test_should_monitor_whitelist_only():
     assert monitor._should_monitor({}) is False
     assert monitor._should_monitor({"telegramtower.events": "true"}) is True
     assert monitor._should_monitor({"telegram-notifier.monitor": "true"}) is True
+
+
+def test_event_monitor_anti_flood():
+    monitor = EventMonitor.__new__(EventMonitor)
+    monitor._event_history = {}
+    monitor._history_lock = threading.Lock()
+
+    # First 3 events for a container are allowed
+    assert monitor._is_flooding("crash_app", "die:1") is False
+    assert monitor._is_flooding("crash_app", "die:1") is False
+    assert monitor._is_flooding("crash_app", "die:1") is False
+
+    # 4th event within 60s is suppressed as flooding
+    assert monitor._is_flooding("crash_app", "die:1") is True

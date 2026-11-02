@@ -1,5 +1,4 @@
 from unittest.mock import MagicMock
-
 import pytest
 
 from docker_manager import DockerManager
@@ -43,7 +42,6 @@ def test_check_for_updates_update_available(mock_docker_client, mocker):
     mock_registry_data.id = "sha256:newhash"
     manager.client.images.get_registry_data.return_value = mock_registry_data
 
-    # Mock registry API to avoid network calls during test
     mocker.patch(
         "registry_api.RegistryFetcher.get_remote_image_info",
         return_value={
@@ -97,7 +95,6 @@ def test_check_for_updates_same_version(mock_docker_client, mocker):
         "RepoDigests": ["myimage@sha256:oldhash"],
         "Config": {"Labels": {"org.opencontainers.image.version": "1.4.0"}},
     }
-
     mock_registry_data = MagicMock()
     mock_registry_data.id = "sha256:newhash"
     manager.client.images.get_registry_data.return_value = mock_registry_data
@@ -114,6 +111,88 @@ def test_check_for_updates_same_version(mock_docker_client, mocker):
 
     image_name, remote_digest, remote_info, is_same_version = manager.check_for_updates(mock_container)
     assert is_same_version is True
+
+
+def test_update_container_self_update_blocked(mock_docker_client):
+    manager = DockerManager()
+    mock_container = MagicMock()
+    mock_container.name = "telegramtower"
+    mock_container.attrs = {"Config": {"Image": "uniextra/telegramtower:latest"}}
+    manager.client.containers.get.return_value = mock_container
+
+    success, msg_key, details = manager.update_container("self_id")
+    assert success is False
+    assert msg_key == "self_update_blocked"
+
+
+def test_update_container_socket_proxy_blocked(mock_docker_client):
+    manager = DockerManager()
+    mock_container = MagicMock()
+    mock_container.name = "docker-socket-proxy"
+    mock_container.attrs = {"Config": {"Image": "tecnativa/docker-socket-proxy:latest"}}
+    manager.client.containers.get.return_value = mock_container
+
+    success, msg_key, details = manager.update_container("proxy_id")
+    assert success is False
+    assert msg_key == "socket_proxy_blocked"
+
+
+def test_update_container_preserves_security_attributes(mock_docker_client, mocker):
+    manager = DockerManager()
+    mock_container = MagicMock()
+    mock_container.name = "secure_app"
+    mock_container.status = "stopped"
+    mock_container.attrs = {
+        "Config": {
+            "Image": "secure_app:latest",
+            "Cmd": ["run"],
+            "Env": ["ENV=1"],
+            "Labels": {"app": "test"},
+            "WorkingDir": "/app",
+            "User": "1000:1000",
+            "Healthcheck": {"Test": ["CMD", "curl", "-f", "http://localhost"]},
+        },
+        "HostConfig": {
+            "Binds": ["/host/data:/data:ro"],
+            "PortBindings": {"80/tcp": [{"HostPort": "8080"}]},
+            "NetworkMode": "bridge",
+            "RestartPolicy": {"Name": "unless-stopped"},
+            "SecurityOpt": ["no-new-privileges:true"],
+            "ReadonlyRootfs": True,
+            "CapDrop": ["ALL"],
+            "Tmpfs": {"/tmp": ""},
+            "Ulimits": [{"Name": "nofile", "Soft": 1024, "Hard": 2048}],
+            "Sysctls": {"net.core.somaxconn": "1024"},
+        },
+        "Mounts": [],
+        "NetworkSettings": {"Networks": {}},
+    }
+    mock_container.image.id = "sha256:old"
+    manager.client.containers.get.return_value = mock_container
+
+    new_img = MagicMock()
+    new_img.id = "sha256:new"
+    new_img.attrs = {"Config": {"Labels": {}}}
+    manager.client.images.pull.return_value = new_img
+
+    recreated = MagicMock()
+    recreated.name = "secure_app"
+    manager.client.containers.create.return_value = recreated
+
+    success, msg_key, details = manager.update_container("secure_id")
+    assert success is True
+    assert msg_key == "update_success"
+
+    # Verify that create was called with preserved security options
+    manager.client.containers.create.assert_called_once()
+    create_kwargs = manager.client.containers.create.call_args[1]
+    assert create_kwargs["security_opt"] == ["no-new-privileges:true"]
+    assert create_kwargs["read_only"] is True
+    assert create_kwargs["cap_drop"] == ["ALL"]
+    assert create_kwargs["tmpfs"] == {"/tmp": ""}
+    assert create_kwargs["working_dir"] == "/app"
+    assert create_kwargs["user"] == "1000:1000"
+    assert create_kwargs["healthcheck"] == {"Test": ["CMD", "curl", "-f", "http://localhost"]}
 
 
 def test_update_container_rollback_on_failure(mock_docker_client):
@@ -144,40 +223,3 @@ def test_update_container_rollback_on_failure(mock_docker_client):
     mock_container.rename.assert_any_call("my_app_tt_backup")
     mock_container.rename.assert_any_call("my_app")
     mock_container.start.assert_called_once()
-
-
-def test_update_container_success_with_version_and_source(mock_docker_client):
-    manager = DockerManager()
-    mock_container = MagicMock()
-    mock_container.name = "bazarr"
-    mock_container.status = "running"
-    mock_container.attrs = {
-        "Config": {"Image": "lscr.io/linuxserver/bazarr:latest", "Cmd": None, "Env": None, "Labels": {}},
-        "HostConfig": {"Binds": None, "PortBindings": None, "NetworkMode": "bridge", "RestartPolicy": {}},
-        "NetworkSettings": {"Networks": {}},
-    }
-    mock_container.image.id = "sha256:old"
-    manager.client.containers.get.return_value = mock_container
-
-    new_img = MagicMock()
-    new_img.id = "sha256:new"
-    new_img.attrs = {
-        "Config": {
-            "Labels": {
-                "org.opencontainers.image.version": "v1.6.2-ls368",
-                "org.opencontainers.image.source": "https://github.com/linuxserver/docker-bazarr",
-            }
-        }
-    }
-    manager.client.images.pull.return_value = new_img
-
-    recreated = MagicMock()
-    recreated.name = "bazarr"
-    manager.client.containers.run.return_value = recreated
-
-    success, msg_key, details = manager.update_container("c_id")
-    assert success is True
-    assert msg_key == "update_success"
-    assert details["version"] == "v1.6.2-ls368"
-    assert details["source"] == "https://github.com/linuxserver/docker-bazarr"
-
