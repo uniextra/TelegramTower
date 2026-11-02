@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Optional
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, filters
@@ -619,15 +619,15 @@ class TelegramBot:
 
                     # Estimate remaining days based on global setting (we don't fetch container labels here for speed)
                     remaining = max(0, q_days_global - age_days)
-                    
+
                     item_text = self.t("quarantine_list_item", name=name, days=remaining)
-                    
+
                     if self.config_db.get_auto_update(name):
                         item_text += " 🔄"
-                        
+
                     if r.get("reset_count", 0) > 0:
                         item_text += " ⚠️"
-                        
+
                     items.append(item_text)
                 except Exception:
                     items.append(self.t("quarantine_list_item", name=name, days="?"))
@@ -861,7 +861,7 @@ class TelegramBot:
         """Sends a notification with Inline Keyboard to update or ignore."""
         state_str = self.t("state_stopped") if is_stopped else ""
         lang = self.config_db.get_language()
-        
+
         safe_container_name = escape_markdown(container_name)
         safe_image = escape_markdown(new_image)
         if is_same_version or reset_count >= 2:
@@ -892,12 +892,12 @@ class TelegramBot:
                 )
             ],
         ]
-        
+
         if is_same_version or reset_count >= 2:
             snooze_text = self.t("snooze_btn")
             # prepend snooze button
             keyboard.insert(0, [InlineKeyboardButton(snooze_text, callback_data=f"snooze_{cid}")])
-            
+
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         try:
@@ -1104,7 +1104,7 @@ class TelegramBot:
                 text=self.t("ignored_msg", container=container_name)
             )
             return
-            
+
         if action == "snooze":
             self.config_db.set_snooze(container_name, 30)
             self.config_db.delete_quarantine_record(container_name)
@@ -1199,7 +1199,7 @@ class TelegramBot:
         for i, container in enumerate(containers):
             if i > 0 and delay > 0:
                 await asyncio.sleep(delay)
-                
+
             if self.config_db.is_snoozed(container.name):
                 logger.info(f"Skipping {container.name} because it is snoozed.")
                 continue
@@ -1354,7 +1354,7 @@ class TelegramBot:
                     success = result[0]
                     key = result[1] if len(result) > 1 else ""
                     msg_str = self.format_update_result(result)
-                    
+
                     if success:
                         if key == "already_up_to_date":
                             logger.info(f"Container {container.name} is already up to date, skipping auto-update notification.")
@@ -1413,9 +1413,9 @@ class TelegramBot:
                     )
                     is_stopped = container.status != "running"
                     sent = await self.send_update_notification(
-                        container.name, 
-                        new_image, 
-                        is_stopped, 
+                        container.name,
+                        new_image,
+                        is_stopped,
                         remote_info,
                         is_same_version=is_same_version,
                         reset_count=q_record.get("reset_count", 0) if (q_days > 0 and q_record) else 0

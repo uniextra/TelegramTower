@@ -140,6 +140,7 @@ def test_update_container_socket_proxy_blocked(mock_docker_client):
 def test_update_container_preserves_security_attributes(mock_docker_client, mocker):
     manager = DockerManager()
     mock_container = MagicMock()
+    mock_container.id = "mock_container_secure_123"
     mock_container.name = "secure_app"
     mock_container.status = "stopped"
     mock_container.attrs = {
@@ -198,6 +199,7 @@ def test_update_container_preserves_security_attributes(mock_docker_client, mock
 def test_update_container_rollback_on_failure(mock_docker_client):
     manager = DockerManager()
     mock_container = MagicMock()
+    mock_container.id = "mock_container_rollback_123"
     mock_container.name = "my_app"
     mock_container.status = "running"
     mock_container.attrs = {

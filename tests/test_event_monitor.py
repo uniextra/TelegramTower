@@ -1,5 +1,4 @@
 import threading
-import pytest
 from unittest.mock import MagicMock
 
 from event_monitor import EventMonitor, escape_markdown

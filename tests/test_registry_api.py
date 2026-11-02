@@ -1,5 +1,4 @@
 from unittest.mock import MagicMock, patch
-import pytest
 from registry_api import RegistryFetcher, is_allowed_realm, DIGEST_REGEX
 
 

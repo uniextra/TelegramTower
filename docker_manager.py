@@ -5,6 +5,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import docker
+import docker.types
 from docker.errors import APIError, DockerException, NotFound
 from docker.models.containers import Container
 
@@ -22,12 +23,17 @@ class DockerManager:
 
     def _is_self_or_infra_container(self, container: Container) -> Tuple[bool, str]:
         """Checks if container is TelegramTower itself or Docker socket proxy to prevent self-destruction."""
-        name = container.name.lower()
-        image_name = (container.attrs.get("Config", {}).get("Image") or "").lower()
+        name = str(getattr(container, "name", "") or "").lower()
+        image_name = ""
+        if hasattr(container, "attrs") and isinstance(container.attrs, dict):
+            image_name = str(container.attrs.get("Config", {}).get("Image") or "").lower()
+
         hostname = os.environ.get("HOSTNAME", "").lower()
+        cid = getattr(container, "id", "")
+        cid_str = str(cid).lower() if isinstance(cid, str) else ""
 
         # Match own hostname / container ID if running in Docker
-        if hostname and (container.id.lower().startswith(hostname) or name == hostname):
+        if hostname and ((cid_str and cid_str.startswith(hostname)) or name == hostname):
             return True, "self_update_blocked"
 
         if name in ("telegramtower", "telegram-tower") or "telegramtower" in image_name:
@@ -165,7 +171,7 @@ class DockerManager:
             try:
                 old_backup = self.client.containers.get(backup_name)
                 old_backup.remove(force=True)
-            except docker.errors.NotFound:
+            except NotFound:
                 pass
             container.rename(backup_name)
         except Exception as rename_e:
@@ -231,8 +237,6 @@ class DockerManager:
             for m in container.attrs.get("Mounts", []):
                 if m.get("Type") == "volume" and m.get("Name"):
                     try:
-                        import docker.types
-
                         mounts.append(
                             docker.types.Mount(
                                 target=m["Destination"],

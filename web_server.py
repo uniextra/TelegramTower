@@ -367,7 +367,7 @@ def dashboard() -> Any:
             db_chat_id=db_chat_id,
             settings=settings,
         )
-    except Exception as e:
+    except Exception:
         logger.exception("Error serving dashboard")
         return Response("Internal Server Error", 500)
 

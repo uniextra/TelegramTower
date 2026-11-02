@@ -2,9 +2,7 @@ import logging
 import os
 import re
 import signal
-import sys
 import threading
-import time
 
 from config_db import ConfigDB
 from docker_manager import DockerManager

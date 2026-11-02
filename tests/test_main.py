@@ -1,6 +1,5 @@
 import os
 from unittest.mock import MagicMock, patch
-import pytest
 
 from main import _get_bot_credentials, main
 
