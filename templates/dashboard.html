@@ -65,24 +65,53 @@
                     <form method="POST" action="/" class="flex flex-col space-y-3">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="action" value="save_bot_credentials">
-                        <div class="relative w-full">
-                            {% if env_token and db_token and env_token != db_token %}
-                            <div class="absolute right-3 top-1/2 -translate-y-1/2 group cursor-help z-10 flex items-center">
-                                <span class="text-amber-500 text-sm drop-shadow-sm" data-i18n-title="conflictToken" title="Conflict Detected: El token usado es el de la web. Se recomienda usar solo uno (web o variable de entorno) para evitar conflictos.">⚠️</span>
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label for="bot_token" class="text-xs font-semibold text-zinc-700" data-i18n="botTokenLabel">Bot Token</label>
+                                {% if masked_token %}
+                                <span class="inline-flex items-center gap-1.5 text-xs font-mono font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200" title="Configured">
+                                    <span>✓</span> <span data-i18n="tokenConfigured">Configurado:</span> <code>{{ masked_token }}</code>
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1 text-xs font-medium text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded" data-i18n="notConfigured">
+                                    No configurado
+                                </span>
+                                {% endif %}
                             </div>
-                            {% endif %}
-                            <input type="password" name="bot_token" id="bot_token" value="" data-i18n-ph="placeholderBotToken" placeholder="{{ masked_token or 'Enter Telegram Bot Token...' }}" autocomplete="off"
-                                   class="flex h-10 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+                            <div class="relative w-full">
+                                {% if env_token and db_token and env_token != db_token %}
+                                <div class="absolute right-3 top-1/2 -translate-y-1/2 group cursor-help z-10 flex items-center">
+                                    <span class="text-amber-500 text-sm drop-shadow-sm" data-i18n-title="conflictToken" title="Conflict Detected: El token usado es el de la web. Se recomienda usar solo uno (web o variable de entorno) para evitar conflictos.">⚠️</span>
+                                </div>
+                                {% endif %}
+                                <input type="password" name="bot_token" id="bot_token" value="" 
+                                       placeholder="{% if masked_token %}{{ masked_token }} (dejar en blanco para mantener){% else %}Introduce el Token del Bot de Telegram...{% endif %}" autocomplete="off"
+                                       class="flex h-10 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+                            </div>
                         </div>
                         
-                        <div class="relative w-full mt-2">
-                            {% if env_chat_id and db_chat_id and env_chat_id != db_chat_id %}
-                            <div class="absolute right-3 top-1/2 -translate-y-1/2 group cursor-help z-10 flex items-center">
-                                <span class="text-amber-500 text-sm drop-shadow-sm" data-i18n-title="conflictChatId" title="Conflict Detected: El Chat ID usado es el de la web. Se recomienda usar solo uno para evitar conflictos.">⚠️</span>
+                        <div class="mt-2">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label for="chat_id" class="text-xs font-semibold text-zinc-700" data-i18n="chatIdLabel">Chat ID</label>
+                                {% if db_chat_id or env_chat_id %}
+                                <span class="inline-flex items-center gap-1.5 text-xs font-mono font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                    <span>✓</span> <code>{{ db_chat_id or env_chat_id }}</code>
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1 text-xs font-medium text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded" data-i18n="notConfigured">
+                                    No configurado
+                                </span>
+                                {% endif %}
                             </div>
-                            {% endif %}
-                            <input type="text" name="chat_id" id="chat_id" value="{{ db_chat_id or env_chat_id }}" data-i18n-ph="placeholderChatId" placeholder="Enter Telegram Chat ID..." 
-                                   class="flex h-10 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+                            <div class="relative w-full">
+                                {% if env_chat_id and db_chat_id and env_chat_id != db_chat_id %}
+                                <div class="absolute right-3 top-1/2 -translate-y-1/2 group cursor-help z-10 flex items-center">
+                                    <span class="text-amber-500 text-sm drop-shadow-sm" data-i18n-title="conflictChatId" title="Conflict Detected: El Chat ID usado es el de la web. Se recomienda usar solo uno para evitar conflictos.">⚠️</span>
+                                </div>
+                                {% endif %}
+                                <input type="text" name="chat_id" id="chat_id" value="{{ db_chat_id or env_chat_id }}" data-i18n-ph="placeholderChatId" placeholder="Enter Telegram Chat ID..." 
+                                       class="flex h-10 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+                            </div>
                         </div>
                         
                         <button type="submit" data-i18n="saveCredentialsBtn" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 h-10 px-6 py-2 shadow-sm w-full mt-2">
@@ -380,6 +409,11 @@
                 containersCount: "Contenedores",
                 botConfigTitle: "Configuración del Bot",
                 botConfigDesc: "Actualiza tus credenciales de Telegram. Los ajustes guardados aquí tienen prioridad sobre las variables de entorno.",
+                botTokenLabel: "Token del Bot",
+                chatIdLabel: "Chat ID",
+                tokenConfigured: "Configurado:",
+                notConfigured: "No configurado",
+                placeholderBotTokenKeep: "•••••••• (dejar en blanco para mantener)",
                 conflictToken: "Conflicto detectado: Se está usando el token de la web. Se recomienda usar solo uno para evitar conflictos.",
                 conflictChatId: "Conflicto detectado: Se está usando el Chat ID de la web. Se recomienda usar solo uno para evitar conflictos.",
                 placeholderBotToken: "Introduce el Token del Bot de Telegram...",
@@ -458,6 +492,11 @@
                 containersCount: "Containers",
                 botConfigTitle: "Bot Configuration",
                 botConfigDesc: "Update your Telegram credentials. Settings saved here override environment variables.",
+                botTokenLabel: "Bot Token",
+                chatIdLabel: "Chat ID",
+                tokenConfigured: "Configured:",
+                notConfigured: "Not configured",
+                placeholderBotTokenKeep: "•••••••• (leave blank to keep)",
                 conflictToken: "Conflict Detected: The web token is being used. It is recommended to use only one (web or environment variable) to avoid conflicts.",
                 conflictChatId: "Conflict Detected: The web Chat ID is being used. It is recommended to use only one to avoid conflicts.",
                 placeholderBotToken: "Enter Telegram Bot Token...",

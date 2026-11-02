@@ -282,7 +282,7 @@ def dashboard() -> Any:
         masked_token = ""
         if effective_token:
             if len(effective_token) > 8:
-                masked_token = f"{effective_token[:4]}••••••••{effective_token[-4:]}"
+                masked_token = f"{effective_token[:6]}••••••••{effective_token[-4:]}"
             else:
                 masked_token = "••••••••"
 
