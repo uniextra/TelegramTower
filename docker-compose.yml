@@ -7,12 +7,13 @@ services:
     container_name: telegramtower
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/app/data
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - WEB_HOST=0.0.0.0
       - WEB_USER=${WEB_USER:-admin}
-      - WEB_PASSWORD=${WEB_PASSWORD:-admin}
+      - WEB_PASSWORD=${WEB_PASSWORD:?Define a secure WEB_PASSWORD}

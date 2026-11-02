@@ -63,6 +63,7 @@
                 </div>
                 <div class="p-6 pt-0 flex-1 flex flex-col justify-between">
                     <form method="POST" action="/" class="flex flex-col space-y-3">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="action" value="save_bot_credentials">
                         <div class="relative w-full">
                             {% if env_token and db_token and env_token != db_token %}
@@ -70,7 +71,7 @@
                                 <span class="text-amber-500 text-sm drop-shadow-sm" data-i18n-title="conflictToken" title="Conflict Detected: El token usado es el de la web. Se recomienda usar solo uno (web o variable de entorno) para evitar conflictos.">⚠️</span>
                             </div>
                             {% endif %}
-                            <input type="text" name="bot_token" id="bot_token" value="{{ db_token or env_token }}" data-i18n-ph="placeholderBotToken" placeholder="Enter Telegram Bot Token..." 
+                            <input type="password" name="bot_token" id="bot_token" value="" data-i18n-ph="placeholderBotToken" placeholder="{{ masked_token or 'Enter Telegram Bot Token...' }}" autocomplete="off"
                                    class="flex h-10 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
                         </div>
                         
@@ -102,6 +103,7 @@
                 </div>
                 <div class="p-6 pt-0">
                     <form method="POST" action="/" class="space-y-4">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="action" value="save_global_settings">
                         
                         <div class="grid grid-cols-2 gap-4">
@@ -299,6 +301,7 @@
                             </td>
                             <td class="px-6 py-4 align-middle text-center" data-sort="{{ '1' if c.auto_update else '0' }}">
                                 <form method="POST" action="/">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <input type="hidden" name="action" value="toggle_auto_update">
                                     <input type="hidden" name="container_name" value="{{ c.name }}">
                                     <button type="submit" class="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 rounded-md transition-transform active:scale-95">
@@ -321,6 +324,7 @@
                                             <span data-i18n="badgeSnoozed">🔕 Snoozed</span>
                                         </div>
                                         <form method="POST" action="/" class="inline-block m-0 p-0">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <input type="hidden" name="action" value="clear_snooze">
                                             <input type="hidden" name="container_name" value="{{ c.name }}">
                                             <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-800 underline decoration-indigo-300 hover:decoration-indigo-800 transition-colors" data-i18n="btnUnsnooze">
@@ -549,12 +553,18 @@
 
             // Send background sync request to save preference in config_db
             try {
+                const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '{{ csrf_token() }}';
                 const formData = new URLSearchParams();
                 formData.append('action', 'set_language');
                 formData.append('language', lang);
+                formData.append('csrf_token', csrfToken);
                 fetch('/', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': csrfToken
+                    },
                     body: formData
                 }).catch(() => {});
             } catch (e) {}
