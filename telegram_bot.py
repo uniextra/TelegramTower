@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -195,7 +196,31 @@ class TelegramBot:
         self._check_job = None
         self.pending_updates = {}
         self._updating_containers = set()
+        self._container_name_map: Dict[str, str] = {}
         self._setup_handlers()
+
+    def _get_short_container_id(self, container_name: str) -> str:
+        """Safely encodes container name into callback_data to respect Telegram's 64-byte limit."""
+        if len(container_name) <= 45:
+            return container_name
+        short_hash = hashlib.sha256(container_name.encode("utf-8")).hexdigest()[:16]
+        self._container_name_map[short_hash] = container_name
+        return f"h:{short_hash}"
+
+    def _resolve_container_name(self, short_or_name: str) -> str:
+        """Resolves short hash identifier back to actual container name."""
+        if short_or_name.startswith("h:"):
+            hash_key = short_or_name[2:]
+            if hash_key in self._container_name_map:
+                return self._container_name_map[hash_key]
+            try:
+                for c in self.docker_manager.get_containers(include_stopped=True):
+                    if hashlib.sha256(c.name.encode("utf-8")).hexdigest()[:16] == hash_key:
+                        self._container_name_map[hash_key] = c.name
+                        return c.name
+            except Exception:
+                pass
+        return short_or_name
 
     @staticmethod
     def _mask_id(identifier: Any) -> str:
@@ -851,18 +876,19 @@ class TelegramBot:
                     remote_info.get("version"), remote_info.get("source")
                 )
 
+        cid = self._get_short_container_id(container_name)
         keyboard = [
             [
                 InlineKeyboardButton(
-                    self.t("update_btn"), callback_data=f"update_{container_name}"
+                    self.t("update_btn"), callback_data=f"update_{cid}"
                 ),
                 InlineKeyboardButton(
-                    self.t("ignore_btn"), callback_data=f"ignore_{container_name}"
+                    self.t("ignore_btn"), callback_data=f"ignore_{cid}"
                 ),
             ],
             [
                 InlineKeyboardButton(
-                    self.t("auto_update_btn"), callback_data=f"auto_{container_name}"
+                    self.t("auto_update_btn"), callback_data=f"auto_{cid}"
                 )
             ],
         ]
@@ -870,7 +896,7 @@ class TelegramBot:
         if is_same_version or reset_count >= 2:
             snooze_text = self.t("snooze_btn")
             # prepend snooze button
-            keyboard.insert(0, [InlineKeyboardButton(snooze_text, callback_data=f"snooze_{container_name}")])
+            keyboard.insert(0, [InlineKeyboardButton(snooze_text, callback_data=f"snooze_{cid}")])
             
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -1050,7 +1076,8 @@ class TelegramBot:
 
         # Update Container Handlers
         try:
-            action, container_name = data.split("_", 1)
+            action, raw_container_name = data.split("_", 1)
+            container_name = self._resolve_container_name(raw_container_name)
         except ValueError:
             return
 

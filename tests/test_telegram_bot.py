@@ -681,6 +681,49 @@ def test_mask_id():
     assert TelegramBot._mask_id("@admin_user") == "@a***er"
 
 
+@pytest.mark.asyncio
+async def test_long_container_name_callback_data_within_64_bytes(mock_docker_manager, mock_config_db, mocker):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "12345", mock_docker_manager, mock_config_db)
+    bot.application.bot.send_message = AsyncMock()
+
+    long_name = "production_microservice_worker_very_long_container_name_exceeding_telegram_callback_limit"
+    assert len(long_name) > 60
+
+    # Sending update notification should generate callback_data <= 64 bytes
+    await bot.send_update_notification(long_name, "image:latest")
+    bot.application.bot.send_message.assert_called_once()
+    call_kwargs = bot.application.bot.send_message.call_args[1]
+    reply_markup = call_kwargs["reply_markup"]
+
+    for row in reply_markup.inline_keyboard:
+        for btn in row:
+            assert len(btn.callback_data.encode("utf-8")) <= 64
+
+    # The generated callback_data for update
+    update_btn = reply_markup.inline_keyboard[0][0]
+    assert update_btn.callback_data.startswith("update_h:")
+
+    # Now verify button_handler resolves it back to long_name
+    mock_update = MagicMock()
+    mock_update.effective_chat.id = 12345
+    mock_update.effective_user.id = 12345
+    mock_update.callback_query.data = update_btn.callback_data
+    mock_update.callback_query.answer = AsyncMock()
+    mock_update.callback_query.edit_message_text = AsyncMock()
+
+    mock_container = MagicMock()
+    mock_container.name = long_name
+    mock_container.id = "long_id"
+    mock_config_db.get_cleanup_old_image.return_value = False
+    mock_docker_manager.get_containers.return_value = [mock_container]
+    mock_docker_manager.update_container.return_value = (True, "update_success_running", {"name": long_name, "cleanup": ""})
+
+    await bot.button_handler(mock_update, MagicMock())
+    mock_docker_manager.update_container.assert_called_once_with("long_id", False)
+
+
+
 
 
 
