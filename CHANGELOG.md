@@ -42,10 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Separated dependencies into `requirements.txt` (production) and `requirements-dev.txt` (testing/linting).
-- Bound default Web Dashboard host to `127.0.0.1` (configurable via `WEB_HOST`).
 - Empty token submission in web dashboard no longer deletes the existing token.
 - Enhanced legacy Markdown escaping across all dynamic fields to avoid broken message syntax.
 
 ### Breaking Changes
-- Web Dashboard no longer allows default `admin/admin` credentials or empty passwords without setting `ALLOW_INSECURE_PASSWORD=true` or `WEB_AUTH_DISABLED=true`.
-- Web Dashboard binds to `127.0.0.1` by default instead of `0.0.0.0`.
+- **Telegram Bot Authorization:** All Telegram commands and buttons now strictly verify incoming user IDs against `TELEGRAM_CHAT_ID` and `TELEGRAM_ALLOWED_USER_IDS`. Unauthorized users will be denied access.
+- **Docker Container Non-Root (`appuser`):** The Docker container now runs as an unprivileged user (`appuser`, UID 1000). If mounting `/var/run/docker.sock` directly, ensure the host socket is accessible to the docker group / UID 1000, use `user: "0:0"` as an override if needed, or adopt the recommended `docker-compose.socket-proxy.yml`.
+- **Database Schema Migration:** Container-specific configuration keys (`auto_*`, `last_updated_*`, `snooze_*`) are automatically migrated into the relational `container_settings` table.
+- **Web Dashboard CSRF & Fail-Closed Auth:** Web forms require valid CSRF tokens. Insecure passwords (<8 characters or trivial) are rejected unless `ALLOW_INSECURE_PASSWORD=true` is set.
+- **Telegram Callback Protocol (64-byte limit):** Long container names now use a deterministic 16-hex hash mapping (`h:<hash>`) to ensure callback data never exceeds Telegram's 64-byte API limit.
