@@ -4,3 +4,6 @@ __pycache__/
 data/
 .pytest_cache/
 .agent
+.ruff_cache/
+.mypy_cache/
+venv/

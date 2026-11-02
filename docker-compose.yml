@@ -1,11 +1,11 @@
-version: '3.8'
-
 services:
   telegramtower:
     build: .
     image: telegramtower:latest
     container_name: telegramtower
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
