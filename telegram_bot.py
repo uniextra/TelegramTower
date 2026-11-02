@@ -16,7 +16,7 @@ def escape_markdown(text: str) -> str:
         return ""
     text = str(text)
     text = text.replace("\\", "\\\\")
-    for char in ("_", "*", "[", "`"):
+    for char in ("_", "*", "[", "]", "`", "(", ")"):
         text = text.replace(char, f"\\{char}")
     return text
 
@@ -366,7 +366,11 @@ class TelegramBot:
                     params.get("version"), params.get("source")
                 )
                 return msg
-            return self.t(key, **params)
+            escaped_params = {
+                k: escape_markdown(v) if isinstance(v, str) else v
+                for k, v in params.items()
+            }
+            return self.t(key, **escaped_params)
         elif isinstance(result, tuple) and len(result) == 2:
             return result[1]
         return str(result)
@@ -829,12 +833,14 @@ class TelegramBot:
         state_str = self.t("state_stopped") if is_stopped else ""
         lang = self.config_db.get_language()
         
+        safe_container_name = escape_markdown(container_name)
+        safe_image = escape_markdown(new_image)
         if is_same_version or reset_count >= 2:
             # Spammy update detected
-            msg = self.t("spammy_update_warning", container=container_name)
+            msg = self.t("spammy_update_warning", container=safe_container_name)
         else:
             msg = self.t(
-                "update_msg", container=container_name, state=state_str, image=new_image
+                "update_msg", container=safe_container_name, state=state_str, image=safe_image
             )
             if remote_info:
                 msg += self._format_version_and_source(

@@ -1,24 +1,62 @@
+import contextlib
 import datetime
+import logging
 import os
+import re
 import sqlite3
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+BOT_TOKEN_REGEX = re.compile(r"^\d{6,}:[A-Za-z0-9_-]{30,}$")
+CHAT_ID_REGEX = re.compile(r"^-?\d+$|^@[A-Za-z0-9_]{5,}$")
 
 
 class ConfigDB:
     def __init__(self, db_path: str = "data/config.db") -> None:
         self.db_path = db_path
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        # Ensure directory exists with secure permissions where supported
+        dir_path = os.path.dirname(os.path.abspath(self.db_path))
+        os.makedirs(dir_path, exist_ok=True)
+        try:
+            if os.name != "nt":
+                os.chmod(dir_path, 0o700)
+        except Exception:
+            pass
+
         self._init_db()
 
+        try:
+            if os.name != "nt" and os.path.exists(self.db_path):
+                os.chmod(self.db_path, 0o600)
+        except Exception:
+            pass
+
+    @contextlib.contextmanager
+    def _connect(self):
+        conn = sqlite3.connect(self.db_path, timeout=15)
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
+
     def _init_db(self) -> None:
-        with sqlite3.connect(self.db_path, timeout=15) as conn:
+        with self._connect() as conn:
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA synchronous=NORMAL;")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS config (
                     key TEXT PRIMARY KEY,
                     value TEXT
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS container_settings (
+                    container_name TEXT,
+                    key TEXT,
+                    value TEXT,
+                    PRIMARY KEY (container_name, key)
                 )
             """)
             conn.execute("""
@@ -38,10 +76,30 @@ class ConfigDB:
             except sqlite3.OperationalError:
                 pass  # Column already exists
 
+            # Migration: copy legacy container keys to container_settings
+            try:
+                cursor = conn.execute("SELECT key, value FROM config")
+                for k, v in cursor.fetchall():
+                    for prefix in ("auto_", "ignored_", "notified_", "snooze_", "last_updated_"):
+                        if k.startswith(prefix):
+                            c_name = k[len(prefix):]
+                            setting_name = prefix.rstrip("_")
+                            conn.execute(
+                                """
+                                INSERT INTO container_settings (container_name, key, value)
+                                VALUES (?, ?, ?)
+                                ON CONFLICT(container_name, key) DO UPDATE SET value=excluded.value
+                                """,
+                                (c_name, setting_name, v),
+                            )
+                            break
+            except Exception as e:
+                logger.debug(f"Migration from config to container_settings skipped: {e}")
+
             conn.commit()
 
     def set_config(self, key: str, value: Any) -> None:
-        with sqlite3.connect(self.db_path, timeout=15) as conn:
+        with self._connect() as conn:
             conn.execute(
                 """
                 INSERT INTO config (key, value)
@@ -50,15 +108,63 @@ class ConfigDB:
             """,
                 (key, str(value)),
             )
-            conn.commit()
 
     def get_config(self, key: str, default: Any = None) -> Any:
-        with sqlite3.connect(self.db_path, timeout=15) as conn:
+        with self._connect() as conn:
             cursor = conn.execute("SELECT value FROM config WHERE key = ?", (key,))
             row = cursor.fetchone()
             if row:
                 return row[0]
             return default
+
+    # Container Settings Helper Methods
+    def _set_container_setting(self, container_name: str, key: str, value: Any) -> None:
+        val_str = str(value)
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO container_settings (container_name, key, value)
+                VALUES (?, ?, ?)
+                ON CONFLICT(container_name, key) DO UPDATE SET value=excluded.value
+                """,
+                (container_name, key, val_str),
+            )
+            # Also update legacy config table for backwards compatibility
+            legacy_key = f"{key}_{container_name}"
+            conn.execute(
+                """
+                INSERT INTO config (key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value=excluded.value
+                """,
+                (legacy_key, val_str),
+            )
+
+    def _get_container_setting(self, container_name: str, key: str, default: Any = None) -> Any:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "SELECT value FROM container_settings WHERE container_name = ? AND key = ?",
+                (container_name, key),
+            )
+            row = cursor.fetchone()
+            if row:
+                return row[0]
+            # Fallback to legacy config table
+            legacy_key = f"{key}_{container_name}"
+            cursor2 = conn.execute("SELECT value FROM config WHERE key = ?", (legacy_key,))
+            row2 = cursor2.fetchone()
+            if row2:
+                return row2[0]
+            return default
+
+    def _delete_container_setting(self, container_name: str, key: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM container_settings WHERE container_name = ? AND key = ?",
+                (container_name, key),
+            )
+            legacy_key = f"{key}_{container_name}"
+            conn.execute("DELETE FROM config WHERE key = ?", (legacy_key,))
 
     # Helpers
     def get_poll_interval_days(self) -> int:
@@ -92,53 +198,62 @@ class ConfigDB:
         self.set_config("language", lang)
 
     def get_ignored_update(self, container_name: str) -> Optional[str]:
-        return self.get_config(f"ignored_{container_name}")
+        return self._get_container_setting(container_name, "ignored")
 
     def set_ignored_update(self, container_name: str, digest: str) -> None:
         if digest:
-            self.set_config(f"ignored_{container_name}", digest)
+            self._set_container_setting(container_name, "ignored", digest)
 
     def get_notified_update(self, container_name: str) -> Optional[str]:
-        return self.get_config(f"notified_{container_name}")
+        return self._get_container_setting(container_name, "notified")
 
     def set_notified_update(self, container_name: str, digest: str) -> None:
         if digest:
-            self.set_config(f"notified_{container_name}", digest)
+            self._set_container_setting(container_name, "notified", digest)
 
     def clear_notified_update(self, container_name: str) -> None:
-        with sqlite3.connect(self.db_path, timeout=15) as conn:
-            conn.execute("DELETE FROM config WHERE key = ?", (f"notified_{container_name}",))
-            conn.commit()
+        self._delete_container_setting(container_name, "notified")
 
     def get_auto_update(self, container_name: str) -> bool:
-        return self.get_config(f"auto_{container_name}", "0") == "1"
+        return self._get_container_setting(container_name, "auto", "0") == "1"
 
     def set_auto_update(self, container_name: str, enabled: bool) -> None:
-        self.set_config(f"auto_{container_name}", "1" if enabled else "0")
+        self._set_container_setting(container_name, "auto", "1" if enabled else "0")
 
     def set_last_updated(self, container_name: str, timestamp: str) -> None:
-        self.set_config(f"last_updated_{container_name}", timestamp)
-        
+        self._set_container_setting(container_name, "last_updated", timestamp)
+
     def get_all_last_updated(self) -> dict:
-        with sqlite3.connect(self.db_path, timeout=15) as conn:
-            cursor = conn.execute("SELECT key, value FROM config WHERE key LIKE 'last_updated_%'")
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "SELECT container_name, value FROM container_settings WHERE key = 'last_updated'"
+            )
             rows = cursor.fetchall()
-            return {row[0].replace("last_updated_", ""): row[1] for row in rows}
+            result = {row[0]: row[1] for row in rows}
+            if not result:
+                # Fallback to config table with proper LIKE ESCAPE and prefix slicing
+                cursor2 = conn.execute(
+                    "SELECT key, value FROM config WHERE key LIKE 'last\\_updated\\_%' ESCAPE '\\'"
+                )
+                for k, v in cursor2.fetchall():
+                    prefix = "last_updated_"
+                    if k.startswith(prefix):
+                        c_name = k[len(prefix):]
+                        result[c_name] = v
+            return result
 
     def set_snooze(self, container_name: str, days: int) -> None:
-        import datetime
         now = datetime.datetime.now(datetime.timezone.utc)
         snoozed_until = (now + datetime.timedelta(days=days)).isoformat()
-        self.set_config(f"snooze_{container_name}", snoozed_until)
+        self._set_container_setting(container_name, "snooze", snoozed_until)
 
     def get_snoozed_until(self, container_name: str) -> Optional[str]:
-        return self.get_config(f"snooze_{container_name}")
+        return self._get_container_setting(container_name, "snooze")
 
     def is_snoozed(self, container_name: str) -> bool:
         snoozed_until_iso = self.get_snoozed_until(container_name)
         if not snoozed_until_iso:
             return False
-        import datetime
         try:
             snoozed_until = datetime.datetime.fromisoformat(snoozed_until_iso)
             now = datetime.datetime.now(datetime.timezone.utc)
@@ -147,36 +262,55 @@ class ConfigDB:
             return False
 
     def clear_snooze(self, container_name: str) -> None:
-        with sqlite3.connect(self.db_path, timeout=15) as conn:
-            conn.execute("DELETE FROM config WHERE key = ?", (f"snooze_{container_name}",))
-            conn.commit()
+        self._delete_container_setting(container_name, "snooze")
 
-    def get_events_enabled(self) -> bool: return self.get_config("events_enabled", "1") == "1"
-    def set_events_enabled(self, enabled: bool) -> None: self.set_config("events_enabled", "1" if enabled else "0")
+    def get_events_enabled(self) -> bool:
+        return self.get_config("events_enabled", "1") == "1"
 
-    def get_events_notify_start(self) -> bool: return self.get_config("events_notify_start", "0") == "1"
-    def set_events_notify_start(self, enabled: bool) -> None: self.set_config("events_notify_start", "1" if enabled else "0")
+    def set_events_enabled(self, enabled: bool) -> None:
+        self.set_config("events_enabled", "1" if enabled else "0")
 
-    def get_events_notify_stop(self) -> bool: return self.get_config("events_notify_stop", "1") == "1"
-    def set_events_notify_stop(self, enabled: bool) -> None: self.set_config("events_notify_stop", "1" if enabled else "0")
+    def get_events_notify_start(self) -> bool:
+        return self.get_config("events_notify_start", "0") == "1"
 
-    def get_events_notify_health(self) -> bool: return self.get_config("events_notify_health", "1") == "1"
-    def set_events_notify_health(self, enabled: bool) -> None: self.set_config("events_notify_health", "1" if enabled else "0")
-    
-    def get_events_whitelist_only(self) -> bool: return self.get_config("events_whitelist_only", "0") == "1"
-    def set_events_whitelist_only(self, enabled: bool) -> None: self.set_config("events_whitelist_only", "1" if enabled else "0")
+    def set_events_notify_start(self, enabled: bool) -> None:
+        self.set_config("events_notify_start", "1" if enabled else "0")
+
+    def get_events_notify_stop(self) -> bool:
+        return self.get_config("events_notify_stop", "1") == "1"
+
+    def set_events_notify_stop(self, enabled: bool) -> None:
+        self.set_config("events_notify_stop", "1" if enabled else "0")
+
+    def get_events_notify_health(self) -> bool:
+        return self.get_config("events_notify_health", "1") == "1"
+
+    def set_events_notify_health(self, enabled: bool) -> None:
+        self.set_config("events_notify_health", "1" if enabled else "0")
+
+    def get_events_whitelist_only(self) -> bool:
+        return self.get_config("events_whitelist_only", "0") == "1"
+
+    def set_events_whitelist_only(self, enabled: bool) -> None:
+        self.set_config("events_whitelist_only", "1" if enabled else "0")
 
     def get_bot_token(self) -> Optional[str]:
         return self.get_config("bot_token")
 
     def set_bot_token(self, token: str) -> None:
-        self.set_config("bot_token", token)
+        token_str = str(token).strip() if token else ""
+        if token_str and not BOT_TOKEN_REGEX.match(token_str):
+            raise ValueError(f"Invalid Telegram bot token format: {token_str}")
+        self.set_config("bot_token", token_str)
 
     def get_chat_id(self) -> Optional[str]:
         return self.get_config("chat_id")
 
     def set_chat_id(self, chat_id: str) -> None:
-        self.set_config("chat_id", chat_id)
+        chat_str = str(chat_id).strip() if chat_id else ""
+        if chat_str and not CHAT_ID_REGEX.match(chat_str):
+            raise ValueError(f"Invalid Telegram chat_id format: {chat_str}")
+        self.set_config("chat_id", chat_str)
 
     # --- Container Settings ---
     # Quarantine methods
@@ -187,7 +321,7 @@ class ConfigDB:
         self.set_config("quarantine_days", days)
 
     def get_quarantine_record(self, container_name: str) -> Optional[Dict[str, Any]]:
-        with sqlite3.connect(self.db_path, timeout=15) as conn:
+        with self._connect() as conn:
             cursor = conn.execute(
                 "SELECT detected_digest, detected_at, reset_count, remote_created_iso FROM quarantine_tracking WHERE container_name = ?",
                 (container_name,),
@@ -203,7 +337,7 @@ class ConfigDB:
             return None
 
     def get_all_quarantine_records(self) -> List[Dict[str, Any]]:
-        with sqlite3.connect(self.db_path, timeout=15) as conn:
+        with self._connect() as conn:
             cursor = conn.execute(
                 "SELECT container_name, detected_digest, detected_at, reset_count, remote_created_iso FROM quarantine_tracking"
             )
@@ -226,10 +360,8 @@ class ConfigDB:
         reset_count: int,
         remote_created_iso: Optional[str] = None,
     ) -> None:
-        import datetime
-
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        with sqlite3.connect(self.db_path, timeout=15) as conn:
+        with self._connect() as conn:
             conn.execute(
                 """
                 INSERT INTO quarantine_tracking (container_name, detected_digest, detected_at, reset_count, remote_created_iso)
@@ -242,15 +374,13 @@ class ConfigDB:
             """,
                 (container_name, digest, now, reset_count, remote_created_iso),
             )
-            conn.commit()
 
     def delete_quarantine_record(self, container_name: str) -> None:
-        with sqlite3.connect(self.db_path, timeout=15) as conn:
+        with self._connect() as conn:
             conn.execute(
                 "DELETE FROM quarantine_tracking WHERE container_name = ?",
                 (container_name,),
             )
-            conn.commit()
 
     # --- Active Hours (Horas Activas) ---
     def get_active_hours_enabled(self) -> bool:

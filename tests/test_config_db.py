@@ -5,6 +5,9 @@ from unittest.mock import patch
 
 from config_db import ConfigDB
 
+VALID_TOKEN = "123456:abcdefABCDEF1234567890abcdef12345"
+VALID_CHAT = "999888"
+
 
 @pytest.fixture
 def temp_db(tmp_path):
@@ -41,10 +44,39 @@ def test_bot_credentials_get_set(temp_db):
     db = ConfigDB(temp_db)
     assert db.get_bot_token() is None
     assert db.get_chat_id() is None
-    db.set_bot_token("123:ABC")
-    db.set_chat_id("999888")
-    assert db.get_bot_token() == "123:ABC"
-    assert db.get_chat_id() == "999888"
+    db.set_bot_token(VALID_TOKEN)
+    db.set_chat_id(VALID_CHAT)
+    assert db.get_bot_token() == VALID_TOKEN
+    assert db.get_chat_id() == VALID_CHAT
+
+
+def test_bot_credentials_validation(temp_db):
+    db = ConfigDB(temp_db)
+    with pytest.raises(ValueError):
+        db.set_bot_token("invalid_token")
+
+    with pytest.raises(ValueError):
+        db.set_chat_id("invalid!chat")
+
+
+def test_container_settings_migration_and_no_collision(temp_db):
+    # Pre-populate legacy config table with potentially colliding names
+    with sqlite3.connect(temp_db) as conn:
+        conn.execute("CREATE TABLE config (key TEXT PRIMARY KEY, value TEXT)")
+        conn.execute("INSERT INTO config VALUES ('auto_app_last_updated_prod', '1')")
+        conn.execute("INSERT INTO config VALUES ('last_updated_app_last_updated_prod', '2026-11-01T10:00:00Z')")
+        conn.execute("INSERT INTO config VALUES ('last_updated_simple', '2026-11-02T10:00:00Z')")
+        conn.commit()
+
+    # Initializing ConfigDB should auto-migrate into container_settings
+    db = ConfigDB(temp_db)
+
+    # Check that app_last_updated_prod is correctly retrieved without key corruption
+    assert db.get_auto_update("app_last_updated_prod") is True
+    all_updated = db.get_all_last_updated()
+    assert "app_last_updated_prod" in all_updated
+    assert all_updated["app_last_updated_prod"] == "2026-11-01T10:00:00Z"
+    assert all_updated["simple"] == "2026-11-02T10:00:00Z"
 
 
 def test_active_hours_logic(temp_db):
@@ -104,5 +136,3 @@ def test_notified_update_methods(temp_db):
 
     db.clear_notified_update("my_container")
     assert db.get_notified_update("my_container") is None
-
-

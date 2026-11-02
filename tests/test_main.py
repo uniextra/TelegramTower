@@ -1,20 +1,22 @@
 import os
-import threading
-import pytest
 from unittest.mock import MagicMock, patch
+import pytest
 
 from main import _get_bot_credentials, main
+
+VALID_TOKEN = "123456:abcdefABCDEF1234567890abcdef12345"
+VALID_CHAT = "999888"
 
 
 def test_get_bot_credentials_from_db():
     mock_db = MagicMock()
-    mock_db.get_bot_token.return_value = "db_token_123"
-    mock_db.get_chat_id.return_value = "db_chat_456"
+    mock_db.get_bot_token.return_value = VALID_TOKEN
+    mock_db.get_chat_id.return_value = VALID_CHAT
 
     with patch.dict(os.environ, {}, clear=True):
         token, chat_id = _get_bot_credentials(mock_db)
-        assert token == "db_token_123"
-        assert chat_id == "db_chat_456"
+        assert token == VALID_TOKEN
+        assert chat_id == VALID_CHAT
 
 
 def test_get_bot_credentials_from_env(monkeypatch):
@@ -22,12 +24,23 @@ def test_get_bot_credentials_from_env(monkeypatch):
     mock_db.get_bot_token.return_value = None
     mock_db.get_chat_id.return_value = None
 
-    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "env_token")
-    monkeypatch.setenv("TELEGRAM_CHAT_ID", "env_chat")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", VALID_TOKEN)
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", VALID_CHAT)
 
     token, chat_id = _get_bot_credentials(mock_db)
-    assert token == "env_token"
-    assert chat_id == "env_chat"
+    assert token == VALID_TOKEN
+    assert chat_id == VALID_CHAT
+
+
+def test_get_bot_credentials_invalid_format():
+    mock_db = MagicMock()
+    mock_db.get_bot_token.return_value = "invalid_token_123"
+    mock_db.get_chat_id.return_value = "invalid!chat"
+
+    with patch.dict(os.environ, {}, clear=True):
+        token, chat_id = _get_bot_credentials(mock_db)
+        assert token is None
+        assert chat_id is None
 
 
 def test_get_bot_credentials_empty():
@@ -50,9 +63,12 @@ def test_main_runs_web_server_when_credentials_missing(monkeypatch):
          patch("main.ConfigDB", return_value=mock_db), \
          patch("main.DockerManager") as mock_dm, \
          patch("main.threading.Thread") as mock_thread, \
-         patch("main.time.sleep", side_effect=KeyboardInterrupt):
-        
-        main()
+         patch("threading.Event.wait", side_effect=KeyboardInterrupt):
+
+        try:
+            main()
+        except KeyboardInterrupt:
+            pass
 
         # Web server thread should be started even though credentials are missing
         mock_thread.assert_called_once()
