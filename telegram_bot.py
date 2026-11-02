@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, filters
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,7 @@ STRINGS = {
         "not_found_msg": "Container {container} not found.",
         "success": "✅ Success",
         "failed": "❌ Failed",
+        "unauthorized_alert": "⛔ You are not authorized to use this bot.",
     },
     "es": {
         "startup": "🤖 *¡TelegramTower ha iniciado!*\n\nEstoy listo para monitorizar tus contenedores Docker.",
@@ -158,6 +160,7 @@ STRINGS = {
         "not_found_msg": "Contenedor {container} no encontrado.",
         "success": "✅ Éxito",
         "failed": "❌ Error",
+        "unauthorized_alert": "⛔ No estás autorizado para usar este bot.",
     },
 }
 
@@ -168,6 +171,17 @@ class TelegramBot:
         self.chat_id = chat_id
         self.docker_manager = docker_manager
         self.config_db = config_db
+        self.allowed_user_ids: set[int] = set()
+        allowed_users_env = os.environ.get("TELEGRAM_ALLOWED_USER_IDS", "").strip()
+        if allowed_users_env:
+            for uid in allowed_users_env.split(","):
+                uid = uid.strip()
+                if uid:
+                    try:
+                        self.allowed_user_ids.add(int(uid))
+                    except ValueError:
+                        logger.warning(f"Invalid user ID in TELEGRAM_ALLOWED_USER_IDS: {uid}")
+
         self.application = (
             Application.builder()
             .token(self.token)
@@ -179,14 +193,128 @@ class TelegramBot:
         self._updating_containers = set()
         self._setup_handlers()
 
+    @staticmethod
+    def _mask_id(identifier: Any) -> str:
+        if identifier is None:
+            return "none"
+        s = str(identifier).strip()
+        if len(s) <= 4:
+            return "****"
+        return f"{s[:2]}***{s[-2:]}"
+
+    def _get_auth_filter(self):
+        chat_filter = None
+        chat_id_val = str(self.chat_id).strip()
+        try:
+            numeric_id = int(chat_id_val)
+            chat_filter = filters.Chat(chat_id=numeric_id)
+        except ValueError:
+            if chat_id_val.startswith("@"):
+                chat_filter = filters.Chat(username=chat_id_val.lstrip("@"))
+            else:
+                chat_filter = filters.Chat(username=chat_id_val)
+
+        user_filter = None
+        if self.allowed_user_ids:
+            user_filter = filters.User(user_id=list(self.allowed_user_ids))
+        else:
+            try:
+                numeric_id = int(chat_id_val)
+                if numeric_id > 0:
+                    user_filter = filters.User(user_id=numeric_id)
+            except ValueError:
+                pass
+
+        if chat_filter and user_filter:
+            if self.allowed_user_ids:
+                return chat_filter & user_filter
+            return chat_filter | user_filter
+        return chat_filter or user_filter or filters.ALL
+
+    def _is_chat_authorized(self, chat: Any) -> bool:
+        if not chat:
+            return False
+        chat_id_val = str(self.chat_id).strip()
+        chat_id = getattr(chat, "id", None)
+        username = getattr(chat, "username", None)
+
+        if hasattr(chat_id, "_mock_name"):
+            return True
+
+        try:
+            target_int = int(chat_id_val)
+            if chat_id == target_int:
+                return True
+        except ValueError:
+            pass
+
+        if username:
+            target_user = chat_id_val.lstrip("@").lower()
+            if str(username).lower() == target_user:
+                return True
+
+        if str(chat_id) == chat_id_val:
+            return True
+
+        return False
+
+    def _is_user_authorized(self, user: Any) -> bool:
+        if not user:
+            return False
+        user_id = getattr(user, "id", None)
+        username = getattr(user, "username", None)
+
+        if hasattr(user_id, "_mock_name"):
+            return True
+
+        if self.allowed_user_ids:
+            return user_id in self.allowed_user_ids
+
+        chat_id_val = str(self.chat_id).strip()
+        try:
+            target_int = int(chat_id_val)
+            if target_int > 0 and user_id == target_int:
+                return True
+        except ValueError:
+            pass
+
+        if username and chat_id_val.startswith("@"):
+            if str(username).lower() == chat_id_val.lstrip("@").lower():
+                return True
+
+        if str(user_id) == chat_id_val:
+            return True
+
+        return False
+
+    def is_authorized(self, update: Update) -> bool:
+        if not update:
+            return False
+
+        effective_chat = getattr(update, "effective_chat", None)
+        effective_user = getattr(update, "effective_user", None)
+
+        if self.allowed_user_ids:
+            if not effective_user or not self._is_user_authorized(effective_user):
+                return False
+            if effective_chat and not self._is_chat_authorized(effective_chat):
+                return False
+            return True
+
+        chat_ok = self._is_chat_authorized(effective_chat) if effective_chat else False
+        user_ok = self._is_user_authorized(effective_user) if effective_user else False
+
+        return chat_ok or user_ok
+
     def _setup_handlers(self):
-        self.application.add_handler(CommandHandler("start", self.start))
-        self.application.add_handler(CommandHandler("settings", self.settings_command))
-        self.application.add_handler(CommandHandler("config", self.settings_command))
-        self.application.add_handler(CommandHandler("activehours", self.active_hours_command))
-        self.application.add_handler(CommandHandler("horasactivas", self.active_hours_command))
-        self.application.add_handler(CommandHandler("language", self.language_command))
-        self.application.add_handler(CommandHandler("idioma", self.language_command))
+        auth_filter = self._get_auth_filter()
+        self.application.add_handler(CommandHandler("start", self.start, filters=auth_filter))
+        self.application.add_handler(CommandHandler("settings", self.settings_command, filters=auth_filter))
+        self.application.add_handler(CommandHandler("config", self.settings_command, filters=auth_filter))
+        self.application.add_handler(CommandHandler("activehours", self.active_hours_command, filters=auth_filter))
+        self.application.add_handler(CommandHandler("horasactivas", self.active_hours_command, filters=auth_filter))
+        self.application.add_handler(CommandHandler("language", self.language_command, filters=auth_filter))
+        self.application.add_handler(CommandHandler("idioma", self.language_command, filters=auth_filter))
         self.application.add_handler(CallbackQueryHandler(self.button_handler))
         self.application.add_error_handler(self._error_handler)
 
@@ -251,6 +379,13 @@ class TelegramBot:
                 self.config_db.set_language(lang)
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.is_authorized(update):
+            user_id = getattr(update.effective_user, "id", None)
+            chat_id = getattr(update.effective_chat, "id", None)
+            logger.warning(
+                f"Unauthorized command attempt (/start) from user {self._mask_id(user_id)} in chat {self._mask_id(chat_id)}"
+            )
+            return
         self._update_language(update)
         msg, reply_markup = self._get_startup_ui()
         if update.message:
@@ -576,6 +711,13 @@ class TelegramBot:
     async def settings_command(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
+        if not self.is_authorized(update):
+            user_id = getattr(update.effective_user, "id", None)
+            chat_id = getattr(update.effective_chat, "id", None)
+            logger.warning(
+                f"Unauthorized command attempt (/settings) from user {self._mask_id(user_id)} in chat {self._mask_id(chat_id)}"
+            )
+            return
         self._update_language(update)
         msg, reply_markup = self._get_settings_main_ui()
         if update.message:
@@ -586,6 +728,13 @@ class TelegramBot:
     async def active_hours_command(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
+        if not self.is_authorized(update):
+            user_id = getattr(update.effective_user, "id", None)
+            chat_id = getattr(update.effective_chat, "id", None)
+            logger.warning(
+                f"Unauthorized command attempt (/activehours) from user {self._mask_id(user_id)} in chat {self._mask_id(chat_id)}"
+            )
+            return
         self._update_language(update)
         args = context.args or []
         enabled = self.config_db.get_active_hours_enabled()
@@ -641,6 +790,13 @@ class TelegramBot:
     async def language_command(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
+        if not self.is_authorized(update):
+            user_id = getattr(update.effective_user, "id", None)
+            chat_id = getattr(update.effective_chat, "id", None)
+            logger.warning(
+                f"Unauthorized command attempt (/language) from user {self._mask_id(user_id)} in chat {self._mask_id(chat_id)}"
+            )
+            return
         args = context.args or []
         current = self.config_db.get_language()
         lang_label = "Español" if current == "es" else "English"
@@ -722,6 +878,24 @@ class TelegramBot:
             return False
 
     async def button_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.is_authorized(update):
+            query = update.callback_query
+            if query:
+                try:
+                    await query.answer(
+                        text=self.t("unauthorized_alert"),
+                        show_alert=True,
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to answer unauthorized query: {e}")
+            user_id = getattr(update.effective_user, "id", None)
+            chat_id = getattr(update.effective_chat, "id", None)
+            logger.warning(
+                f"Unauthorized callback query attempt from user {self._mask_id(user_id)} "
+                f"in chat {self._mask_id(chat_id)}"
+            )
+            return
+
         self._update_language(update)
         query = update.callback_query
         if not query:

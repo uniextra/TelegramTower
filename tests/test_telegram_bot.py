@@ -601,6 +601,87 @@ async def test_button_handler_concurrent_update_and_ignore(
     assert completion_order == ["ignore_b", "update_a"]
 
 
+@pytest.mark.asyncio
+async def test_button_handler_unauthorized_user(mock_docker_manager, mock_config_db, mocker):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "12345", mock_docker_manager, mock_config_db)
+
+    # Attacker with different user ID and chat ID
+    mock_update = MagicMock()
+    mock_update.effective_user.id = 99999
+    mock_update.effective_chat.id = 99999
+    mock_update.effective_chat.username = "attacker"
+    mock_update.effective_user.username = "attacker"
+    mock_update.callback_query.data = "update_mycontainer"
+    mock_update.callback_query.answer = AsyncMock()
+    mock_update.callback_query.edit_message_text = AsyncMock()
+
+    mock_context = MagicMock()
+
+    await bot.button_handler(mock_update, mock_context)
+
+    # Must answer with alert and return without updating container
+    mock_update.callback_query.answer.assert_called_once()
+    call_kwargs = mock_update.callback_query.answer.call_args[1]
+    assert call_kwargs.get("show_alert") is True
+    assert "not authorized" in call_kwargs.get("text", "").lower() or "no estás autorizado" in call_kwargs.get("text", "").lower()
+    mock_docker_manager.update_container.assert_not_called()
+    mock_config_db.set_auto_update.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_commands_unauthorized_user(mock_docker_manager, mock_config_db, mocker):
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    bot = TelegramBot("fake_token", "12345", mock_docker_manager, mock_config_db)
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = 99999
+    mock_update.effective_chat.id = 99999
+    mock_update.effective_chat.username = "attacker"
+    mock_update.effective_user.username = "attacker"
+    mock_update.message.reply_text = AsyncMock()
+
+    mock_context = MagicMock()
+    mock_context.args = ["on"]
+
+    await bot.start(mock_update, mock_context)
+    await bot.settings_command(mock_update, mock_context)
+    await bot.active_hours_command(mock_update, mock_context)
+    await bot.language_command(mock_update, mock_context)
+
+    mock_update.message.reply_text.assert_not_called()
+    mock_config_db.set_active_hours_enabled.assert_not_called()
+    mock_config_db.set_language.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_telegram_allowed_user_ids(mock_docker_manager, mock_config_db, mocker, monkeypatch):
+    monkeypatch.setenv("TELEGRAM_ALLOWED_USER_IDS", "111,222")
+    mocker.patch("telegram.ext.ApplicationBuilder.build", return_value=MagicMock())
+    # Group chat with negative ID
+    bot = TelegramBot("fake_token", "-10012345", mock_docker_manager, mock_config_db)
+
+    # 1. User 111 is allowed in the group
+    update_allowed = MagicMock()
+    update_allowed.effective_user.id = 111
+    update_allowed.effective_chat.id = -10012345
+    assert bot.is_authorized(update_allowed) is True
+
+    # 2. User 333 is not in allowed_user_ids
+    update_rejected = MagicMock()
+    update_rejected.effective_user.id = 333
+    update_rejected.effective_chat.id = -10012345
+    assert bot.is_authorized(update_rejected) is False
+
+
+def test_mask_id():
+    assert TelegramBot._mask_id(None) == "none"
+    assert TelegramBot._mask_id(12) == "****"
+    assert TelegramBot._mask_id("123456789") == "12***89"
+    assert TelegramBot._mask_id("@admin_user") == "@a***er"
+
+
+
 
 
 
