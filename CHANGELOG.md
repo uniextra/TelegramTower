@@ -5,6 +5,20 @@ All notable changes to **TelegramTower** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-11-10
+
+### Added
+- **Per-Container Activity History Logs:**
+  - New `container_logs` table in SQLite with automatic pruning (keeps the 50 most recent events per container).
+  - Automatically captures update detections, sent notifications, manual and auto-updates, snooze/unsnooze actions, ignores, and failures.
+- **Interactive Timeline Drawer in Web Dashboard:**
+  - Dedicated "History" column with an expandable drawer under each container row.
+  - Displays color-coded events with thematic icons, details, formatted timestamps, and last-updated highlights.
+  - Full bilingual i18n support (English & Spanish) across all event types and descriptions.
+  - Table column sorting maintains seamless drawer alignment.
+- **Bot Configuration Token Status Badge:**
+  - Visual confirmation badge (`✓ Configured: 123456••••••••wxYZ`) in the web settings form to recognize the active bot ID without plaintext exposure.
+
 ## [2.0.0] - 2026-11-02
 
 ### Added
