@@ -135,3 +135,42 @@ def test_notified_update_methods(temp_db):
 
     db.clear_notified_update("my_container")
     assert db.get_notified_update("my_container") is None
+
+
+def test_container_logs(temp_db):
+    db = ConfigDB(temp_db)
+    # Empty initially
+    assert db.get_container_logs("nginx") == []
+
+    # Add logs
+    db.add_container_log("nginx", "update_detected", "v1.25 -> v1.26")
+    db.add_container_log("nginx", "notified", "Telegram notification sent")
+    db.add_container_log("redis", "snoozed", "Muted for 30 days")
+
+    logs_nginx = db.get_container_logs("nginx")
+    assert len(logs_nginx) == 2
+    # Most recent first
+    assert logs_nginx[0]["event_type"] == "notified"
+    assert logs_nginx[0]["details"] == "Telegram notification sent"
+    assert logs_nginx[1]["event_type"] == "update_detected"
+
+    logs_redis = db.get_container_logs("redis")
+    assert len(logs_redis) == 1
+    assert logs_redis[0]["event_type"] == "snoozed"
+
+    # Test get_all_container_logs grouped
+    all_logs = db.get_all_container_logs(limit_per_container=5)
+    assert "nginx" in all_logs
+    assert "redis" in all_logs
+    assert len(all_logs["nginx"]) == 2
+    assert len(all_logs["redis"]) == 1
+
+    # Test pruning: insert 55 logs for nginx
+    for i in range(55):
+        db.add_container_log("nginx", "ping", f"ping {i}")
+
+    logs_pruned = db.get_container_logs("nginx", limit=100)
+    assert len(logs_pruned) <= 50
+    # The most recent should be ping 54
+    assert logs_pruned[0]["details"] == "ping 54"
+

@@ -297,11 +297,12 @@
                             <th class="h-11 px-6 align-middle font-medium text-center cursor-pointer select-none group" onclick="sortTable(3)"><span data-i18n="thAutoUpdate">Auto-Update</span> <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
                             <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(4)"><span data-i18n="thQuarantineStatus">Quarantine Status</span> <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
                             <th class="h-11 px-6 align-middle font-medium cursor-pointer select-none group" onclick="sortTable(5)"><span data-i18n="thLastUpdated">Last Updated</span> <span class="text-zinc-300 group-hover:text-zinc-500 ml-1 inline-block">&#8597;</span></th>
+                            <th class="h-11 px-4 align-middle font-medium text-center"><span data-i18n="thHistory">History</span></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-200 text-zinc-700">
                         {% for c in containers %}
-                        <tr class="transition-colors hover:bg-zinc-50/50">
+                        <tr class="container-row transition-colors hover:bg-zinc-50/50" data-container-id="{{ loop.index }}">
                             <td class="px-6 py-4 align-middle font-medium text-zinc-900 flex items-center gap-2.5" data-sort="{{ c.name }}">
                                 <div class="bg-zinc-100 p-1.5 rounded-md border border-zinc-200 shadow-sm">
                                     <svg class="w-4 h-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
@@ -386,6 +387,75 @@
                                     {{ c.last_updated }}
                                 {% endif %}
                             </td>
+                            <td class="px-4 py-4 align-middle text-center">
+                                <button type="button" onclick="toggleLogs('logs-{{ loop.index }}')" 
+                                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-zinc-200 bg-white hover:bg-zinc-100 text-zinc-700 shadow-xs transition cursor-pointer">
+                                    <span>📜</span>
+                                    <span data-i18n="btnViewLogs">Logs</span>
+                                    {% if c.logs and c.logs|length > 0 %}
+                                    <span class="text-[10px] bg-zinc-100 font-semibold text-zinc-700 px-1.5 py-0.2 rounded-full font-mono">{{ c.logs|length }}</span>
+                                    {% endif %}
+                                    <svg id="chevron-logs-{{ loop.index }}" class="w-3.5 h-3.5 text-zinc-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr id="logs-{{ loop.index }}" class="logs-row hidden bg-zinc-50/70 border-b border-zinc-200">
+                            <td colspan="7" class="px-6 py-4">
+                                <div class="rounded-lg border border-zinc-200 bg-white p-4 shadow-xs">
+                                    <div class="flex items-center justify-between pb-2 mb-3 border-b border-zinc-100 text-xs font-semibold text-zinc-700">
+                                        <span class="flex items-center gap-1.5">
+                                            <span>📜</span>
+                                            <span data-i18n="activityLogFor">Activity History for</span>
+                                            <span class="font-mono text-zinc-900 bg-zinc-100 px-1.5 py-0.5 rounded">{{ c.name }}</span>
+                                        </span>
+                                        <span class="text-zinc-400 font-normal text-[11px]"><span data-i18n="lastUpdatedLabel">Last updated:</span> <strong class="text-zinc-600 font-medium">{{ c.last_updated }}</strong></span>
+                                    </div>
+                                    {% if c.logs and c.logs|length > 0 %}
+                                    <div class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                                        {% for log in c.logs %}
+                                        <div class="flex items-center justify-between text-xs py-1.5 px-2.5 rounded bg-zinc-50/60 hover:bg-zinc-100/80 border-l-2 transition-colors
+                                            {% if log.event_type == 'updated' or log.event_type == 'auto_updated' %}border-emerald-500
+                                            {% elif log.event_type == 'update_failed' %}border-rose-500
+                                            {% elif log.event_type == 'update_detected' %}border-blue-500
+                                            {% elif log.event_type == 'notified' %}border-amber-500
+                                            {% elif log.event_type == 'snoozed' %}border-indigo-500
+                                            {% else %}border-zinc-300{% endif %}">
+                                            <div class="flex items-center gap-2 min-w-0">
+                                                <span class="text-sm shrink-0">
+                                                    {% if log.event_type == 'updated' %}🚀
+                                                    {% elif log.event_type == 'auto_updated' %}🔄
+                                                    {% elif log.event_type == 'update_failed' %}❌
+                                                    {% elif log.event_type == 'update_detected' %}🔍
+                                                    {% elif log.event_type == 'notified' %}🔔
+                                                    {% elif log.event_type == 'snoozed' %}🔕
+                                                    {% elif log.event_type == 'unsnoozed' %}▶️
+                                                    {% elif log.event_type == 'ignored' %}🙈
+                                                    {% elif log.event_type == 'auto_update_enabled' %}⚡
+                                                    {% elif log.event_type == 'auto_update_disabled' %}⏸️
+                                                    {% else %}📌{% endif %}
+                                                </span>
+                                                <span class="font-medium text-zinc-800 shrink-0" data-i18n-event="{{ log.event_type }}">
+                                                    {{ log.event_type }}
+                                                </span>
+                                                {% if log.details %}
+                                                <span class="text-zinc-500 font-mono text-[11px] truncate max-w-xs md:max-w-lg" title="{{ log.details }}">
+                                                    — {{ log.details }}
+                                                </span>
+                                                {% endif %}
+                                            </div>
+                                            <span class="text-[11px] font-mono text-zinc-400 shrink-0 ml-3">
+                                                {{ log.timestamp }}
+                                            </span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% else %}
+                                    <p class="text-xs text-zinc-400 italic py-2 text-center" data-i18n="noLogsRecorded">
+                                        No activity logs recorded yet. Events will appear here as updates are checked, notified, or postponed.
+                                    </p>
+                                    {% endif %}
+                                </div>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -400,6 +470,32 @@
 
     <!-- Frontend Scripting Logic & i18n Dictionary -->
     <script>
+        const eventTitles = {
+            update_detected: { es: "Actualización detectada", en: "Update Detected" },
+            notified: { es: "Aviso enviado", en: "Notification Sent" },
+            snoozed: { es: "Postergado (Snooze)", en: "Postponed (Snooze)" },
+            unsnoozed: { es: "Reanudado (Un-snooze)", en: "Resumed (Un-snooze)" },
+            updated: { es: "Actualizado", en: "Updated" },
+            auto_updated: { es: "Auto-actualizado", en: "Auto-Updated" },
+            update_failed: { es: "Fallo al actualizar", en: "Update Failed" },
+            ignored: { es: "Ignorado", en: "Ignored" },
+            auto_update_enabled: { es: "Auto-update activado", en: "Auto-Update Enabled" },
+            auto_update_disabled: { es: "Auto-update desactivado", en: "Auto-Update Disabled" }
+        };
+
+        function toggleLogs(id) {
+            const el = document.getElementById(id);
+            const chevron = document.getElementById('chevron-' + id);
+            if (!el) return;
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+                if (chevron) chevron.classList.add('rotate-180');
+            } else {
+                el.classList.add('hidden');
+                if (chevron) chevron.classList.remove('rotate-180');
+            }
+        }
+
         const translations = {
             es: {
                 appTitle: "TelegramTower Dashboard",
@@ -471,6 +567,11 @@
                 thAutoUpdate: "Auto-Actualizar",
                 thQuarantineStatus: "Estado de Cuarentena",
                 thLastUpdated: "Última Actualización",
+                thHistory: "Historial",
+                btnViewLogs: "Logs",
+                activityLogFor: "Historial de actividad de",
+                lastUpdatedLabel: "Última actualización:",
+                noLogsRecorded: "No hay registros de actividad aún. Los eventos aparecerán aquí cuando se detecten, notifiquen o pospongan actualizaciones.",
                 badgeRunning: "En ejecución",
                 badgeExited: "Detenido",
                 autoUpdateEnabledTitle: "Auto-Actualización activada (Clic para desactivar)",
@@ -554,6 +655,11 @@
                 thAutoUpdate: "Auto-Update",
                 thQuarantineStatus: "Quarantine Status",
                 thLastUpdated: "Last Updated",
+                thHistory: "History",
+                btnViewLogs: "Logs",
+                activityLogFor: "Activity History for",
+                lastUpdatedLabel: "Last updated:",
+                noLogsRecorded: "No activity logs recorded yet. Events will appear here as updates are checked, notified, or postponed.",
                 badgeRunning: "Running",
                 badgeExited: "Exited",
                 autoUpdateEnabledTitle: "Auto-Update Enabled (Click to Disable)",
@@ -628,6 +734,14 @@
                 if (t[key]) el.setAttribute('title', t[key]);
             });
 
+            // Translate event names
+            document.querySelectorAll('[data-i18n-event]').forEach(el => {
+                const ev = el.getAttribute('data-i18n-event');
+                if (eventTitles[ev]) {
+                    el.textContent = eventTitles[ev][lang] || eventTitles[ev].en;
+                }
+            });
+
             // Update language toggle button text: shows the OTHER language to switch to
             const langBtnText = document.getElementById('lang-btn-text');
             if (langBtnText) {
@@ -651,7 +765,7 @@
         function sortTable(columnIndex) {
             const table = document.getElementById("containers-table");
             const tbody = table.querySelector("tbody");
-            const rows = Array.from(tbody.querySelectorAll("tr"));
+            const rows = Array.from(tbody.querySelectorAll("tr.container-row"));
             const headers = table.querySelectorAll("th");
 
             let isAsc = true;
@@ -696,7 +810,11 @@
                 return 0;
             });
 
-            rows.forEach(row => tbody.appendChild(row));
+            rows.forEach(row => {
+                tbody.appendChild(row);
+                const detailRow = document.getElementById("logs-" + row.getAttribute("data-container-id"));
+                if (detailRow) tbody.appendChild(detailRow);
+            });
         }
     </script>
 </body>

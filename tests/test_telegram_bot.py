@@ -41,6 +41,7 @@ async def test_button_handler_ignore(mock_docker_manager, mock_config_db, mocker
 
     mock_update.callback_query.answer.assert_called_once()
     mock_update.callback_query.edit_message_text.assert_called_once()
+    mock_config_db.add_container_log.assert_called_with("mycontainer", "ignored", "Update ignored via Telegram")
 
 
 @pytest.mark.asyncio
@@ -75,6 +76,9 @@ async def test_button_handler_update(mock_docker_manager, mock_config_db, mocker
         text="✅ Success: Updated mycontainer and started successfully. Old image removed.",
         parse_mode="Markdown",
         disable_web_page_preview=True,
+    )
+    mock_config_db.add_container_log.assert_called_with(
+        "mycontainer", "updated", "Updated manually via Telegram"
     )
 
 

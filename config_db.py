@@ -67,6 +67,19 @@ class ConfigDB:
                     reset_count INTEGER
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS container_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    container_name TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    details TEXT
+                )
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_container_logs_name_time 
+                ON container_logs(container_name, timestamp DESC)
+            """)
 
             # Migration: add remote_created_iso if not exists
             try:
@@ -454,3 +467,88 @@ class ConfigDB:
 
         diff = int((target_dt - dt).total_seconds())
         return max(0, diff)
+
+    # Container Activity Logs Methods
+
+    def add_container_log(self, container_name: str, event_type: str, details: str = "") -> None:
+        """Adds an event log for a container, keeping up to 50 most recent entries per container."""
+        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO container_logs (container_name, timestamp, event_type, details)
+                VALUES (?, ?, ?, ?)
+                """,
+                (container_name, now_iso, event_type, str(details or "")),
+            )
+            # Prune entries beyond 50 for this container
+            conn.execute(
+                """
+                DELETE FROM container_logs
+                WHERE container_name = ? AND id NOT IN (
+                    SELECT id FROM container_logs
+                    WHERE container_name = ?
+                    ORDER BY timestamp DESC, id DESC
+                    LIMIT 50
+                )
+                """,
+                (container_name, container_name),
+            )
+            conn.commit()
+
+    def get_container_logs(self, container_name: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Returns the recent logs for a container ordered by timestamp descending."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                SELECT id, container_name, timestamp, event_type, details
+                FROM container_logs
+                WHERE container_name = ?
+                ORDER BY timestamp DESC, id DESC
+                LIMIT ?
+                """,
+                (container_name, limit),
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "id": r[0],
+                    "container_name": r[1],
+                    "timestamp": r[2],
+                    "event_type": r[3],
+                    "details": r[4] or "",
+                }
+                for r in rows
+            ]
+
+    def get_all_container_logs(self, limit_per_container: int = 5) -> Dict[str, List[Dict[str, Any]]]:
+        """Returns recent logs for all containers grouped by container_name."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                WITH ranked_logs AS (
+                    SELECT id, container_name, timestamp, event_type, details,
+                           ROW_NUMBER() OVER (PARTITION BY container_name ORDER BY timestamp DESC, id DESC) as rn
+                    FROM container_logs
+                )
+                SELECT id, container_name, timestamp, event_type, details
+                FROM ranked_logs
+                WHERE rn <= ?
+                ORDER BY container_name, timestamp DESC, id DESC
+                """,
+                (limit_per_container,),
+            )
+            rows = cursor.fetchall()
+            result: Dict[str, List[Dict[str, Any]]] = {}
+            for r in rows:
+                c_name = r[1]
+                if c_name not in result:
+                    result[c_name] = []
+                result[c_name].append({
+                    "id": r[0],
+                    "container_name": r[1],
+                    "timestamp": r[2],
+                    "event_type": r[3],
+                    "details": r[4] or "",
+                })
+            return result

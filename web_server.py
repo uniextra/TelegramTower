@@ -248,9 +248,16 @@ def dashboard() -> Any:
                     if not existing_containers or container_name in existing_containers:
                         if action == "toggle_auto_update":
                             current_val = config_db.get_auto_update(container_name)
-                            config_db.set_auto_update(container_name, not current_val)
+                            new_val = not current_val
+                            config_db.set_auto_update(container_name, new_val)
+                            config_db.add_container_log(
+                                container_name,
+                                "auto_update_enabled" if new_val else "auto_update_disabled",
+                                "Dashboard"
+                            )
                         elif action == "clear_snooze":
                             config_db.clear_snooze(container_name)
+                            config_db.add_container_log(container_name, "unsnoozed", "Dashboard")
                 else:
                     logger.warning(f"Rejected invalid container_name: {container_name}")
 
@@ -309,6 +316,7 @@ def dashboard() -> Any:
         }
 
         last_updated_dict = config_db.get_all_last_updated()
+        all_logs = config_db.get_all_container_logs(limit_per_container=10)
 
         data = []
         for c in containers:
@@ -342,6 +350,23 @@ def dashboard() -> Any:
                 except Exception:
                     q_info = {"remaining": "?", "has_warning": False}
 
+            c_logs = all_logs.get(c_name, [])
+            formatted_logs = []
+            for entry in c_logs:
+                ts_str = entry.get("timestamp", "")
+                formatted_ts = ts_str
+                try:
+                    clean_ts = ts_str.replace("Z", "+00:00")
+                    dt_log = datetime.datetime.fromisoformat(clean_ts)
+                    formatted_ts = dt_log.strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    pass
+                formatted_logs.append({
+                    "timestamp": formatted_ts,
+                    "event_type": entry.get("event_type", ""),
+                    "details": entry.get("details", "")
+                })
+
             data.append(
                 {
                     "name": c_name,
@@ -351,6 +376,7 @@ def dashboard() -> Any:
                     "quarantine": q_info,
                     "snoozed": snoozed,
                     "last_updated": last_updated_str,
+                    "logs": formatted_logs,
                 }
             )
 

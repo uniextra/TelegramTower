@@ -205,3 +205,87 @@ def test_security_headers_and_health_endpoint():
     assert resp.headers.get("X-Content-Type-Options") == "nosniff"
     assert resp.headers.get("Referrer-Policy") == "no-referrer"
     assert "Content-Security-Policy" in resp.headers
+
+
+def test_dashboard_renders_container_logs():
+    mock_docker = MagicMock()
+    mock_container = MagicMock()
+    mock_container.name = "test_app"
+    mock_container.status = "running"
+    mock_container.attrs = {"Config": {"Image": "test/app:latest"}}
+    mock_docker.get_containers.return_value = [mock_container]
+
+    mock_config = MagicMock()
+    mock_config.get_quarantine_days.return_value = 0
+    mock_config.get_all_quarantine_records.return_value = []
+    mock_config.get_bot_token.return_value = None
+    mock_config.get_chat_id.return_value = None
+    mock_config.get_poll_interval_days.return_value = 1
+    mock_config.get_request_delay_seconds.return_value = 0
+    mock_config.get_cleanup_old_image.return_value = False
+    mock_config.get_include_stopped.return_value = False
+    mock_config.get_events_enabled.return_value = False
+    mock_config.get_events_notify_start.return_value = False
+    mock_config.get_events_notify_stop.return_value = False
+    mock_config.get_events_notify_health.return_value = False
+    mock_config.get_events_whitelist_only.return_value = False
+    mock_config.get_active_hours_enabled.return_value = False
+    mock_config.get_active_hours_start.return_value = "08:00"
+    mock_config.get_active_hours_end.return_value = "02:00"
+    mock_config.is_in_active_hours.return_value = False
+    mock_config.get_language.return_value = "en"
+    mock_config.get_all_last_updated.return_value = {"test_app": "2026-11-10T08:00:00Z"}
+    mock_config.get_auto_update.return_value = False
+    mock_config.is_snoozed.return_value = False
+    mock_config.get_all_container_logs.return_value = {
+        "test_app": [
+            {
+                "id": 1,
+                "container_name": "test_app",
+                "timestamp": "2026-11-10T08:00:00Z",
+                "event_type": "update_detected",
+                "details": "test/app:v2.0",
+            }
+        ]
+    }
+
+    app.config["DOCKER_MANAGER"] = mock_docker
+    app.config["CONFIG_DB"] = mock_config
+
+    client = app.test_client()
+    with patch.dict(os.environ, {"WEB_AUTH_DISABLED": "true"}, clear=True):
+        resp = client.get("/")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert "test_app" in html
+        assert "update_detected" in html
+        assert "test/app:v2.0" in html
+
+
+def test_toggle_auto_update_logs_event():
+    mock_docker = MagicMock()
+    mock_container = MagicMock()
+    mock_container.name = "web_app"
+    mock_docker.get_containers.return_value = [mock_container]
+
+    mock_config = MagicMock()
+    mock_config.get_auto_update.return_value = False
+
+    app.config["DOCKER_MANAGER"] = mock_docker
+    app.config["CONFIG_DB"] = mock_config
+
+    client = app.test_client()
+    with patch.dict(os.environ, {"WEB_AUTH_DISABLED": "true"}, clear=True):
+        resp = client.post(
+            "/",
+            data={
+                "action": "toggle_auto_update",
+                "container_name": "web_app",
+            },
+        )
+        assert resp.status_code == 302
+        mock_config.set_auto_update.assert_called_once_with("web_app", True)
+        mock_config.add_container_log.assert_called_once_with(
+            "web_app", "auto_update_enabled", "Dashboard"
+        )
+

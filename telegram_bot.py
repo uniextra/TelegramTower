@@ -1099,6 +1099,7 @@ class TelegramBot:
                 self.config_db.set_ignored_update(container_name, remote_digest)
             self.config_db.clear_notified_update(container_name)
             self.pending_updates.pop(container_name, None)
+            self.config_db.add_container_log(container_name, "ignored", "Update ignored via Telegram")
 
             await query.edit_message_text(
                 text=self.t("ignored_msg", container=container_name)
@@ -1110,6 +1111,7 @@ class TelegramBot:
             self.config_db.delete_quarantine_record(container_name)
             self.config_db.clear_notified_update(container_name)
             self.pending_updates.pop(container_name, None)
+            self.config_db.add_container_log(container_name, "snoozed", "Snoozed for 30 days via Telegram")
             msg = self.t("snoozed_msg", container=container_name)
             await query.edit_message_text(text=msg, parse_mode="Markdown")
             return
@@ -1160,6 +1162,9 @@ class TelegramBot:
                     self.config_db.set_last_updated(container_name, datetime.datetime.now(datetime.timezone.utc).isoformat())
                     self.config_db.clear_notified_update(container_name)
                     self.pending_updates.pop(container_name, None)
+                    self.config_db.add_container_log(container_name, "updated", "Updated manually via Telegram")
+                else:
+                    self.config_db.add_container_log(container_name, "update_failed", f"Failed: {msg_str}")
 
                 try:
                     await query.edit_message_text(
@@ -1218,6 +1223,11 @@ class TelegramBot:
                         f"Update for {container.name} was previously ignored. Skipping."
                     )
                     continue
+
+                if self.pending_updates.get(container.name) != remote_digest and self.config_db.get_notified_update(container.name) != remote_digest:
+                    v_str = remote_info.get("version") if remote_info else ""
+                    detail = f"{new_image}" + (f" ({v_str})" if v_str else "")
+                    self.config_db.add_container_log(container.name, "update_detected", detail)
 
                 labels = getattr(container, "labels", {})
 
@@ -1385,7 +1395,9 @@ class TelegramBot:
                             msg += self.t("dependents_recreated", deps=safe_deps)
                         self.config_db.clear_notified_update(container.name)
                         self.config_db.clear_snooze(container.name)
+                        self.config_db.add_container_log(container.name, "auto_updated", f"Auto-updated to {new_image}")
                     else:
+                        self.config_db.add_container_log(container.name, "update_failed", f"Auto-update failed: {msg_str}")
                         msg = self.t(
                             "auto_updating_msg", container=escape_markdown(container.name)
                         ) + f"\n\nError: {msg_str}"
@@ -1422,6 +1434,9 @@ class TelegramBot:
                     )
                     if sent:
                         self.config_db.set_notified_update(container.name, remote_digest)
+                        v_str = remote_info.get("version") if remote_info else ""
+                        detail = f"{new_image}" + (f" ({v_str})" if v_str else "")
+                        self.config_db.add_container_log(container.name, "notified", detail)
             else:
                 logger.info(f"No update for {container.name}")
                 self.config_db.delete_quarantine_record(container.name)
