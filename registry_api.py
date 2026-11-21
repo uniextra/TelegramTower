@@ -53,6 +53,67 @@ def is_safe_ip(host: str) -> bool:
     return True
 
 
+def is_safe_registry_host(registry: str) -> bool:
+    """Validates that a registry hostname/IP is not private, loopback, link-local, or localhost."""
+    if not registry:
+        return False
+    parsed = urllib.parse.urlparse(f"//{registry}")
+    host = (parsed.hostname or registry.split(":")[0]).strip().lower()
+    if not host or host == "localhost":
+        return False
+
+    try:
+        ip = ipaddress.ip_address(host)
+        return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved)
+    except ValueError:
+        pass
+
+    if host in ALLOWED_REALM_HOSTS:
+        return True
+
+    return is_safe_ip(host)
+
+
+def _safe_get(session: requests.Session, url: str, max_redirects: int = 3, **kwargs: Any) -> Optional[requests.Response]:
+    """Performs an HTTP GET with manual SSRF-checked HTTPS redirects (blocks unsafe hosts and auth leaks)."""
+    current_url = url
+    req_kwargs = dict(kwargs)
+    req_kwargs["allow_redirects"] = False
+    req_kwargs.setdefault("timeout", 10)
+
+    for hop in range(max_redirects + 1):
+        resp = session.get(current_url, **req_kwargs)
+        if resp.status_code not in (301, 302, 303, 307, 308):
+            return resp
+
+        if hop >= max_redirects:
+            logger.warning(f"SSRF Protection: Exceeded max redirects ({max_redirects}) for '{url}'")
+            return None
+
+        location = resp.headers.get("Location")
+        if not location:
+            return None
+
+        redirect_url = urllib.parse.urljoin(current_url, location)
+        parsed_redirect = urllib.parse.urlparse(redirect_url)
+        redirect_host = parsed_redirect.hostname
+
+        if parsed_redirect.scheme != "https" or not redirect_host or not is_safe_registry_host(redirect_host):
+            logger.warning(f"SSRF Protection: Blocked redirect to unsafe location '{redirect_url}'")
+            return None
+
+        current_host = urllib.parse.urlparse(current_url).hostname or ""
+        if redirect_host.lower() != current_host.lower() and "headers" in req_kwargs and isinstance(req_kwargs["headers"], dict):
+            req_kwargs["headers"] = {
+                k: v for k, v in req_kwargs["headers"].items() if k.lower() != "authorization"
+            }
+
+        req_kwargs.pop("params", None)
+        current_url = redirect_url
+
+    return None
+
+
 def is_allowed_realm(realm_url: str, expected_registry: str) -> bool:
     """Validates that authentication realm is HTTPS and on an approved registry host (SSRF protection)."""
     parsed = urllib.parse.urlparse(realm_url)
@@ -123,12 +184,16 @@ class RegistryFetcher:
     def get_auth_token(registry: str, repository: str) -> Optional[str]:
         """
         Retrieves a Bearer token for the given registry and repository by triggering a 401 challenge.
-        Protects against SSRF via realm validation.
+        Protects against SSRF via host and realm validation.
         """
+        if not is_safe_registry_host(registry):
+            logger.warning(f"SSRF Protection: Blocked unsafe registry host '{registry}'.")
+            return None
+
         session = _get_session()
         try:
             url = f"https://{registry}/v2/"
-            resp = session.get(url, timeout=10)
+            resp = session.get(url, timeout=10, allow_redirects=False)
 
             if resp.status_code == 401 and "Www-Authenticate" in resp.headers:
                 auth_header = resp.headers["Www-Authenticate"]
@@ -153,7 +218,7 @@ class RegistryFetcher:
                     "scope": f"repository:{repository}:pull",
                 }
 
-                token_resp = session.get(realm, params=token_params, timeout=10)
+                token_resp = session.get(realm, params=token_params, timeout=10, allow_redirects=False)
                 if token_resp.status_code == 200:
                     data = token_resp.json()
                     return data.get("token") or data.get("access_token")
@@ -171,6 +236,10 @@ class RegistryFetcher:
         """
         Fetches the manifest. Handles multi-arch lists by picking linux/amd64 or linux/arm64.
         """
+        if not is_safe_registry_host(registry):
+            logger.warning(f"SSRF Protection: Blocked unsafe registry host '{registry}'.")
+            return None
+
         headers = {
             "Accept": (
                 "application/vnd.docker.distribution.manifest.v2+json, "
@@ -193,11 +262,12 @@ class RegistryFetcher:
 
         session = _get_session()
         try:
-            resp = session.get(url, headers=headers, timeout=10)
+            resp = _safe_get(session, url, headers=headers, timeout=10)
 
-            if resp.status_code != 200:
+            if not resp or resp.status_code != 200:
+                status_info = resp.status_code if resp else "Blocked/No response"
                 logger.error(
-                    f"Failed to fetch manifest for {repository}:{reference} - Status: {resp.status_code}"
+                    f"Failed to fetch manifest for {repository}:{reference} - Status: {status_info}"
                 )
                 return None
 
@@ -292,6 +362,10 @@ class RegistryFetcher:
     def get_remote_image_info(image_name: str) -> Optional[Dict[str, Any]]:
         registry, repository, tag = RegistryFetcher.parse_image_name(image_name)
 
+        if not is_safe_registry_host(registry):
+            logger.warning(f"SSRF Protection: Blocked unsafe registry host '{registry}' for '{image_name}'.")
+            return None
+
         try:
             token = RegistryFetcher.get_auth_token(registry, repository)
             manifest = RegistryFetcher.fetch_manifest(registry, repository, tag, token)
@@ -312,9 +386,9 @@ class RegistryFetcher:
             blob_url = f"https://{registry}/v2/{safe_repo}/blobs/{config_digest}"
 
             session = _get_session()
-            blob_resp = session.get(blob_url, headers=headers, timeout=10)
+            blob_resp = _safe_get(session, blob_url, headers=headers, timeout=10)
 
-            if blob_resp.status_code == 200:
+            if blob_resp and blob_resp.status_code == 200:
                 config_json = blob_resp.json()
                 created = config_json.get("created")
 

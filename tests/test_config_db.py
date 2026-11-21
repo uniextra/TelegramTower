@@ -174,3 +174,28 @@ def test_container_logs(temp_db):
     # The most recent should be ping 54
     assert logs_pruned[0]["details"] == "ping 54"
 
+
+def test_bot_token_encryption_at_rest(temp_db, monkeypatch):
+    monkeypatch.setenv("CONFIG_ENCRYPTION_KEY", "my-super-secret-master-key")
+    db = ConfigDB(temp_db)
+    db.set_bot_token(VALID_TOKEN)
+
+    raw_stored = db.get_config("bot_token")
+    assert raw_stored.startswith("enc:v1:")
+    assert VALID_TOKEN not in raw_stored
+    assert db.get_bot_token() == VALID_TOKEN
+
+    # Wrong key fails safely
+    monkeypatch.setenv("CONFIG_ENCRYPTION_KEY", "wrong-key")
+    assert db.get_bot_token() is None
+
+    # Restore key and test tamper detection
+    monkeypatch.setenv("CONFIG_ENCRYPTION_KEY", "my-super-secret-master-key")
+    tampered = raw_stored[:-4] + ("AAAA" if raw_stored[-4:] != "AAAA" else "BBBB")
+    db.set_config("bot_token", tampered)
+    assert db.get_bot_token() is None
+
+    # Legacy plaintext fallback remains readable when encryption key is set
+    db.set_config("bot_token", VALID_TOKEN)
+    assert db.get_bot_token() == VALID_TOKEN
+

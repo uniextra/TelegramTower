@@ -204,7 +204,9 @@ def test_security_headers_and_health_endpoint():
     assert resp.headers.get("X-Frame-Options") == "DENY"
     assert resp.headers.get("X-Content-Type-Options") == "nosniff"
     assert resp.headers.get("Referrer-Policy") == "no-referrer"
-    assert "Content-Security-Policy" in resp.headers
+    csp = resp.headers.get("Content-Security-Policy", "")
+    assert "script-src 'self' 'nonce-" in csp
+    assert "script-src 'self' 'unsafe-inline'" not in csp
 
 
 def test_dashboard_renders_container_logs():
@@ -260,6 +262,13 @@ def test_dashboard_renders_container_logs():
         assert "test_app" in html
         assert "update_detected" in html
         assert "test/app:v2.0" in html
+        csp = resp.headers.get("Content-Security-Policy", "")
+        import re as _re
+        match = _re.search(r"'nonce-([^']+)'", csp)
+        assert match is not None
+        nonce = match.group(1)
+        assert f'nonce="{nonce}"' in html
+        assert "onclick=" not in html
 
 
 def test_toggle_auto_update_logs_event():
@@ -288,4 +297,26 @@ def test_toggle_auto_update_logs_event():
         mock_config.add_container_log.assert_called_once_with(
             "web_app", "auto_update_enabled", "Dashboard"
         )
+
+
+def test_rate_limiting_memory_pruning():
+    import time
+    from web_server import _check_rate_limit, _record_failed_login, MAX_LOGIN_TRACKED_IPS
+
+    # Checking a clean IP does not retain empty list entries
+    assert _check_rate_limit("192.0.2.10") is True
+    assert "192.0.2.10" not in _login_attempts
+
+    # Expired IP entry is removed when checked
+    _login_attempts["192.0.2.20"] = [time.time() - 120]
+    assert _check_rate_limit("192.0.2.20") is True
+    assert "192.0.2.20" not in _login_attempts
+
+    # Dictionary is bounded under flood of distinct IPs
+    now = time.time()
+    for i in range(MAX_LOGIN_TRACKED_IPS + 25):
+        _login_attempts[f"198.51.100.{i}"] = [now - 120]
+    _record_failed_login("203.0.113.1")
+    assert len(_login_attempts) <= MAX_LOGIN_TRACKED_IPS
+    assert "203.0.113.1" in _login_attempts
 

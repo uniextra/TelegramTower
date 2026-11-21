@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
-from registry_api import RegistryFetcher, is_allowed_realm, DIGEST_REGEX
+import requests
+from registry_api import RegistryFetcher, is_allowed_realm, is_safe_registry_host, _safe_get, DIGEST_REGEX
 
 
 def test_extract_version_from_oci_label():
@@ -97,3 +98,64 @@ def test_digest_regex_validation():
 
     traversal = "sha256:../../../etc/passwd"
     assert DIGEST_REGEX.match(traversal) is None
+
+
+def test_is_safe_registry_host():
+    assert is_safe_registry_host("127.0.0.1:5000") is False
+    assert is_safe_registry_host("localhost:5000") is False
+    assert is_safe_registry_host("169.254.169.254") is False
+    assert is_safe_registry_host("10.0.0.5") is False
+    assert is_safe_registry_host("registry-1.docker.io") is True
+    assert is_safe_registry_host("ghcr.io") is True
+
+
+def test_get_auth_token_blocks_unsafe_registry_host():
+    with patch("requests.Session.get") as mock_get:
+        assert RegistryFetcher.get_auth_token("127.0.0.1:5000", "app") is None
+        assert RegistryFetcher.get_auth_token("169.254.169.254", "app") is None
+        assert RegistryFetcher.get_auth_token("localhost:5000", "app") is None
+        mock_get.assert_not_called()
+
+
+def test_safe_get_blocks_unsafe_redirects():
+    mock_redirect_http = MagicMock()
+    mock_redirect_http.status_code = 302
+    mock_redirect_http.headers = {"Location": "http://169.254.169.254/latest/meta-data"}
+
+    session = requests.Session()
+    with patch.object(session, "get", return_value=mock_redirect_http) as mock_get:
+        resp = _safe_get(session, "https://registry-1.docker.io/v2/test/blobs/sha256:abc")
+        assert resp is None
+        assert mock_get.call_count == 1
+        assert mock_get.call_args[1]["allow_redirects"] is False
+
+    mock_redirect_private_ip = MagicMock()
+    mock_redirect_private_ip.status_code = 307
+    mock_redirect_private_ip.headers = {"Location": "https://10.0.0.1/blob"}
+
+    with patch.object(session, "get", return_value=mock_redirect_private_ip) as mock_get:
+        resp = _safe_get(session, "https://registry-1.docker.io/v2/test/blobs/sha256:abc")
+        assert resp is None
+        assert mock_get.call_count == 1
+
+
+def test_safe_get_strips_auth_on_cross_host_redirect():
+    mock_redirect = MagicMock()
+    mock_redirect.status_code = 307
+    mock_redirect.headers = {"Location": "https://auth.docker.io/cdn/blob"}
+
+    mock_ok = MagicMock()
+    mock_ok.status_code = 200
+
+    session = requests.Session()
+    with patch.object(session, "get", side_effect=[mock_redirect, mock_ok]) as mock_get:
+        resp = _safe_get(
+            session,
+            "https://registry-1.docker.io/v2/test/blobs/sha256:abc",
+            headers={"Authorization": "Bearer secret-token", "Accept": "application/json"},
+        )
+        assert resp is mock_ok
+        assert mock_get.call_count == 2
+        second_headers = mock_get.call_args_list[1][1]["headers"]
+        assert "Authorization" not in second_headers
+        assert second_headers["Accept"] == "application/json"
