@@ -9,7 +9,7 @@ from functools import wraps
 from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import urlparse
 
-from flask import Flask, Response, redirect, render_template, request, session, url_for
+from flask import Flask, Response, g, redirect, render_template, request, session, url_for
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,9 @@ app.config.update(
 )
 
 TRIVIAL_PASSWORDS = {"admin", "password", "123456", "12345678", "root", "toor"}
+
+MAX_LOGIN_TRACKED_IPS = 1000
+LOGIN_WINDOW_SECONDS = 60
 
 _login_attempts: Dict[str, List[float]] = {}
 _login_lock = threading.Lock()
@@ -34,21 +37,49 @@ def is_password_secure(password: Optional[str]) -> bool:
     return True
 
 
+def _prune_login_attempts(now: float) -> None:
+    """Purges expired IP tracking entries and caps dictionary size to prevent unbounded memory growth. Must hold _login_lock."""
+    expired_ips = []
+    for tracked_ip, ts_list in _login_attempts.items():
+        recent = [t for t in ts_list if now - t < LOGIN_WINDOW_SECONDS]
+        if recent:
+            _login_attempts[tracked_ip] = recent
+        else:
+            expired_ips.append(tracked_ip)
+
+    for tracked_ip in expired_ips:
+        _login_attempts.pop(tracked_ip, None)
+
+    while len(_login_attempts) >= MAX_LOGIN_TRACKED_IPS:
+        oldest_ip = min(_login_attempts, key=lambda k: max(_login_attempts[k]))
+        _login_attempts.pop(oldest_ip, None)
+
+
 def _check_rate_limit(ip: str) -> bool:
     """Returns True if request is allowed, False if IP exceeded 5 failed attempts in 60s."""
     now = time.time()
     with _login_lock:
-        timestamps = [t for t in _login_attempts.get(ip, []) if now - t < 60]
-        _login_attempts[ip] = timestamps
-        return len(timestamps) < 5
+        if len(_login_attempts) >= MAX_LOGIN_TRACKED_IPS:
+            _prune_login_attempts(now)
+
+        if ip not in _login_attempts:
+            return True
+
+        timestamps = [t for t in _login_attempts[ip] if now - t < LOGIN_WINDOW_SECONDS]
+        if timestamps:
+            _login_attempts[ip] = timestamps
+            return len(timestamps) < 5
+
+        _login_attempts.pop(ip, None)
+        return True
 
 
 def _record_failed_login(ip: str) -> None:
     now = time.time()
     with _login_lock:
-        if ip not in _login_attempts:
-            _login_attempts[ip] = []
-        _login_attempts[ip].append(now)
+        if ip not in _login_attempts and len(_login_attempts) >= MAX_LOGIN_TRACKED_IPS:
+            _prune_login_attempts(now)
+        _login_attempts.setdefault(ip, []).append(now)
 
 
 def _record_successful_login(ip: str) -> None:
@@ -114,6 +145,15 @@ def get_csrf_token() -> str:
 app.jinja_env.globals["csrf_token"] = get_csrf_token
 
 
+def get_csp_nonce() -> str:
+    if not hasattr(g, "csp_nonce"):
+        g.csp_nonce = secrets.token_urlsafe(16)
+    return g.csp_nonce
+
+
+app.jinja_env.globals["csp_nonce"] = get_csp_nonce
+
+
 @app.before_request
 def csrf_protect() -> Optional[Response]:
     # Allow tests to disable CSRF validation when testing without forms
@@ -149,6 +189,7 @@ def csrf_protect() -> Optional[Response]:
 
 @app.after_request
 def add_security_headers(response: Response) -> Response:
+    nonce = get_csp_nonce()
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
@@ -156,7 +197,7 @@ def add_security_headers(response: Response) -> Response:
         "default-src 'self'; "
         "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com; "
-        "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; "
+        f"script-src 'self' 'nonce-{nonce}' https://cdn.tailwindcss.com; "
         "img-src 'self' data:;"
     )
     return response

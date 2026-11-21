@@ -1,8 +1,12 @@
+import base64
 import contextlib
 import datetime
+import hashlib
+import hmac
 import logging
 import os
 import re
+import secrets
 import sqlite3
 from typing import Any, Dict, List, Optional
 
@@ -307,14 +311,78 @@ class ConfigDB:
     def set_events_whitelist_only(self, enabled: bool) -> None:
         self.set_config("events_whitelist_only", "1" if enabled else "0")
 
+    def _get_encryption_key(self) -> Optional[bytes]:
+        key_str = os.environ.get("CONFIG_ENCRYPTION_KEY", "").strip()
+        return key_str.encode("utf-8") if key_str else None
+
+    def _encrypt_value(self, plaintext: str) -> str:
+        key_bytes = self._get_encryption_key()
+        if not plaintext or key_bytes is None:
+            return plaintext
+
+        salt = secrets.token_bytes(16)
+        dk = hashlib.pbkdf2_hmac("sha256", key_bytes, salt, 100_000, dklen=64)
+        enc_key, mac_key = dk[:32], dk[32:]
+
+        pt_bytes = plaintext.encode("utf-8")
+        ct_chunks = []
+        for idx, offset in enumerate(range(0, len(pt_bytes), 32)):
+            chunk = pt_bytes[offset : offset + 32]
+            stream_block = hashlib.sha256(enc_key + salt + idx.to_bytes(4, "big")).digest()
+            ct_chunks.append(bytes(a ^ b for a, b in zip(chunk, stream_block)))
+
+        ciphertext = b"".join(ct_chunks)
+        mac = hmac.new(mac_key, salt + ciphertext, hashlib.sha256).digest()
+        payload = base64.urlsafe_b64encode(salt + mac + ciphertext).decode("ascii")
+        return f"enc:v1:{payload}"
+
+    def _decrypt_value(self, stored: Optional[str]) -> Optional[str]:
+        if not stored or not stored.startswith("enc:v1:"):
+            return stored
+
+        key_bytes = self._get_encryption_key()
+        if key_bytes is None:
+            logger.error("Encrypted bot_token found in database, but CONFIG_ENCRYPTION_KEY is not set.")
+            return None
+
+        try:
+            raw = base64.urlsafe_b64decode(stored[len("enc:v1:") :].encode("ascii"))
+            if len(raw) < 48:
+                logger.error("Malformed encrypted bot_token payload.")
+                return None
+
+            salt = raw[:16]
+            mac = raw[16:48]
+            ciphertext = raw[48:]
+
+            dk = hashlib.pbkdf2_hmac("sha256", key_bytes, salt, 100_000, dklen=64)
+            enc_key, mac_key = dk[:32], dk[32:]
+
+            expected_mac = hmac.new(mac_key, salt + ciphertext, hashlib.sha256).digest()
+            if not hmac.compare_digest(mac, expected_mac):
+                logger.error("Integrity check failed while decrypting bot_token.")
+                return None
+
+            pt_chunks = []
+            for idx, offset in enumerate(range(0, len(ciphertext), 32)):
+                chunk = ciphertext[offset : offset + 32]
+                stream_block = hashlib.sha256(enc_key + salt + idx.to_bytes(4, "big")).digest()
+                pt_chunks.append(bytes(a ^ b for a, b in zip(chunk, stream_block)))
+
+            return b"".join(pt_chunks).decode("utf-8")
+        except Exception as e:
+            logger.error(f"Failed to decrypt stored bot_token: {e}")
+            return None
+
     def get_bot_token(self) -> Optional[str]:
-        return self.get_config("bot_token")
+        return self._decrypt_value(self.get_config("bot_token"))
 
     def set_bot_token(self, token: str) -> None:
         token_str = str(token).strip() if token else ""
         if token_str and not BOT_TOKEN_REGEX.match(token_str):
             raise ValueError(f"Invalid Telegram bot token format: {token_str}")
-        self.set_config("bot_token", token_str)
+        stored_val = self._encrypt_value(token_str) if token_str else ""
+        self.set_config("bot_token", stored_val)
 
     def get_chat_id(self) -> Optional[str]:
         return self.get_config("chat_id")
